@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>blink · social – презентация фич</title>
+<link rel="stylesheet" href="prototypes/shared.css" />
+<style>
+/* ===== presentation deck ===== */
+:root{ --deck-bg:#08080a; }
+html,body{height:100%; margin:0}
+body.deck-body{background:var(--deck-bg); color:var(--text); font-family:var(--font-ui); overflow:hidden; -webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+
+.deck-top{position:fixed; inset:0 0 auto 0; z-index:30; height:60px; display:flex; align-items:center; gap:14px;
+  padding:0 28px; background:linear-gradient(#08080a,rgba(8,8,10,.7)); backdrop-filter:blur(10px); border-bottom:1px solid var(--hairline)}
+.deck-top .brand{display:flex; align-items:center; gap:10px; font-weight:800; font-size:16px; letter-spacing:-.3px}
+.deck-top .brand img{width:28px; height:28px; border-radius:8px}
+.deck-top .brand span{color:var(--text-soft); font-weight:600}
+.deck-top .count{margin-left:auto; font-family:var(--font-body); font-size:13px; color:var(--text-muted); letter-spacing:.5px}
+.deck-top .count b{color:var(--text); font-weight:800}
+
+.deck{position:fixed; inset:60px 0 84px 0; overflow:hidden}
+.track{display:flex; height:100%; width:500%; transition:transform .52s var(--ease)}
+.slide{flex:0 0 20%; height:100%; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:clamp(28px,5vw,64px);
+  align-items:center; justify-content:center; max-width:1180px; margin:0 auto; padding:20px 56px; overflow:hidden}
+.slide-text{max-width:520px; justify-self:end; max-height:100%; overflow-y:auto; padding-right:2px}
+.slide-text::-webkit-scrollbar{width:0}
+.slide-proto{display:flex; flex-direction:column; align-items:center; gap:12px; min-width:0}
+/* phone scales to fit the viewport height – --pscale is set by JS (fitPhone) */
+.phone-shell{width:calc(360px * var(--pscale,1)); height:calc(740px * var(--pscale,1)); flex:none; overflow:hidden}
+.phone-shell iframe{width:360px; height:740px; border:0; background:transparent; display:block; transform:scale(var(--pscale,1)); transform-origin:top left}
+.open-proto{font-family:var(--font-body); font-size:12.5px; color:var(--text-muted); text-decoration:none; padding:6px 12px; border-radius:999px; transition:.15s ease}
+.open-proto:hover{color:var(--green); background:var(--green-tint)}
+
+/* slide text reuses .point/.try from shared.css; sizes tuned to fit a 768px-tall laptop with no scroll */
+.slide-text .num{display:inline-block; font-size:12px; font-weight:800; letter-spacing:.6px; text-transform:uppercase; color:var(--green); margin-bottom:10px}
+.slide-text h2{font-size:clamp(27px,2.5vw,34px); font-weight:800; letter-spacing:-.6px; line-height:1.08; margin:0 0 13px; text-transform:lowercase}
+.slide-text .lede{font-size:15.5px; line-height:1.5; color:var(--text-read); margin:0 0 16px}
+.slide-text .lede b{color:#fff; font-weight:700}
+.slide-text .points{gap:11px; margin-bottom:15px}
+.slide-text .point p{font-size:13.5px; line-height:1.48}
+.slide-text .point .k{margin-bottom:3px}
+.slide-text .try{padding:8px 13px; font-size:12.5px}
+
+/* ===== bottom pager ===== */
+.pager{position:fixed; inset:auto 0 0 0; z-index:30; height:84px; display:flex; align-items:center; justify-content:center; gap:10px;
+  padding:0 16px; background:linear-gradient(rgba(8,8,10,.6),#08080a); backdrop-filter:blur(10px); border-top:1px solid var(--hairline)}
+.pager .arrow{width:46px; height:46px; flex:none; border-radius:50%; border:1px solid var(--border); background:var(--surface); color:#fff;
+  display:flex; align-items:center; justify-content:center; cursor:pointer; transition:.14s var(--ease)}
+.pager .arrow:hover{background:var(--surface-3)}
+.pager .arrow:disabled{opacity:.3; cursor:default}
+.pager .arrow svg{width:20px; height:20px}
+.pager .tabs{display:flex; gap:6px; min-width:0; flex-wrap:nowrap; overflow:hidden}
+/* number always shows; label only on the active (or hovered) tab – the row can never outgrow its width */
+.tab{display:flex; flex-direction:row; align-items:center; gap:8px; border:none; background:none; cursor:pointer;
+  height:46px; padding:0 12px; border-radius:13px; transition:background .28s cubic-bezier(.16,1,.3,1); white-space:nowrap; flex:none}
+.tab .tn{font-family:var(--font-body); font-weight:800; font-size:12px; letter-spacing:.5px; color:var(--text-muted); transition:color .28s cubic-bezier(.16,1,.3,1)}
+.tab .tl{max-width:0; opacity:0; transform:translateX(-6px); overflow:hidden; font-size:13px; font-weight:600; color:#fff; text-transform:lowercase;
+  transition:max-width .4s cubic-bezier(.16,1,.3,1), opacity .3s ease, transform .4s cubic-bezier(.16,1,.3,1)}
+.tab:hover{background:var(--surface-2)}
+.tab:hover .tn{color:var(--text-soft)}
+.tab:hover .tl{max-width:150px; opacity:1; transform:none; color:var(--text-soft)}
+.tab.on{background:var(--surface)}
+.tab.on .tn{color:var(--green)}
+.tab.on .tl{max-width:150px; opacity:1; transform:none; color:#fff}
+
+:focus-visible{outline:2px solid var(--green); outline-offset:2px}
+.tab:focus-visible,.arrow:focus-visible{outline-offset:-2px}
+
+@media (max-width:820px){
+  .slide{display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:18px; padding:16px 18px 28px; overflow-y:auto}
+  .slide-text{flex:none; max-width:none; width:100%; max-height:none; overflow:visible; justify-self:auto; padding-right:0}
+  .slide-proto{flex:none; width:100%}
+}
+@media (max-width:560px){
+  .tab{padding:0 9px}
+  .tab.on .tl,.tab:hover .tl{max-width:120px}
+}
+@media (prefers-reduced-motion: reduce){ .track{transition:none} .tab .tl{transition:none} }
+</style>
+</head>
+<body class="deck-body">
+
+<header class="deck-top">
+  <div class="brand"><img src="blink-logo.webp" alt="blink"/> blink <span>· social</span></div>
+  <div class="count"><b id="cnum">01</b> / 05</div>
+</header>
+
+<main class="deck">
+  <div class="track" id="track">
+      <section class="slide" aria-label="01 чаты событий">
+        <div class="slide-text">
+<div class="num">01 – чаты событий</div>
+      <h2>общий чат для всех, кто пришёл на одно событие</h2>
+      <p class="lede">Когда в одной точке – на концерте, в баре, в парке – собирается много юзеров, мы автоматом создаем <b>общий чат этого места</b>. Юзеры добавляют друг друга в друзья и общаются – даже когда событие закончилось.</p>
+      <div class="points">
+        <div class="point"><span class="k win">зачем это нужно</span><p>Заговорить с человеком рядом почти невозможно: нет повода. В таком чате повод уже есть – вы на одном событии в один момент. <b>Барьер первого сообщения исчезает.</b></p></div>
+        <div class="point"><span class="k risk">риски</span><p>Пустой чат убивает идею. Поэтому он включается только тогда, когда людей рядом достаточно, чтобы разговор завязался сам.</p></div>
+        <div class="point"><span class="k metric">целевые метрики</span><p>сообщений на участника чата, доля чатов, где сообщений более 20, конверсия в п2п диалоги.</p></div>
+      </div>
+        </div>
+        <div class="slide-proto">
+          <div class="phone-shell"><iframe loading="lazy" title="чаты событий" src="prototypes/f1-events.html?v=6"></iframe></div>
+          <a class="open-proto" href="prototypes/f1-events.html?v=6" target="_blank" rel="noopener">открыть прототип ↗</a>
+        </div>
+      </section>
+      <section class="slide" aria-label="02 события рядом">
+        <div class="slide-text">
+<div class="num">02 – события рядом</div>
+      <h2>лента того, что происходит вокруг прямо сейчас</h2>
+      <p class="lede">Экран из двух частей. Сверху – <b>чекины по городу</b>: живые фото из мест, где сейчас происходит что-то интересное. Ниже – <b>события, которые Blink находит сам</b> по скоплениям людей: место, сколько человек, когда началось. Каждое фото привязано к своему событию, а не висит в общей ленте. До любого места – маршрут в один тап.</p>
+      <div class="points">
+        <div class="point"><span class="k win">зачем это нужно</span><p>Когда видишь, что рядом уже что-то происходит, проще выйти из дома. И привязка к событию делает чекин полезным: фото, никому не нужное в общей ленте, рядом с событием <b>отвечает на вопрос «как там сейчас?».</b></p></div>
+        <div class="point"><span class="k risk">риски</span><p>Толпа на вокзале в час пик – не событие. Такие скопления приложение отсекает, иначе лента забьётся мусором.</p></div>
+        <div class="point"><span class="k metric">целевые метрики</span><p>посещения раздела, DAU чекинов, конверсия во вход в чат.</p></div>
+      </div>
+        </div>
+        <div class="slide-proto">
+          <div class="phone-shell"><iframe loading="lazy" title="события рядом" src="prototypes/f2-nearby.html?v=30"></iframe></div>
+          <a class="open-proto" href="prototypes/f2-nearby.html?v=30" target="_blank" rel="noopener">открыть прототип ↗</a>
+        </div>
+      </section>
+      <section class="slide" aria-label="03 люди рядом">
+        <div class="slide-text">
+<div class="num">03 – люди рядом</div>
+      <h2>карта людей рядом, где видно, кто чем занят</h2>
+      <p class="lede">Пересобираем Люди рядом, наполняя новым контентом. Даем больше возможностей для полезной коммуникации – временные статусы с предлагаемыми вариантами, чат внутри фичи, время установки статуса. Дополняем дейтинг функционал через список людей и фильтры.</p>
+      <div class="points">
+        <div class="point"><span class="k win">зачем это нужно</span><p>Обычная карта «людей рядом» показывает только кто рядом, но не чем они живут. Временные статусы и чаты добавляют это и <b>помогают найти рядом человека в том же настроении</b>.</p></div>
+        <div class="point"><span class="k risk">риски</span><p>Наркотики, педофилы, угрозы и прочие прелести жизни</p></div>
+        <div class="point"><span class="k metric">целевые метрики</span><p>DAU фичи, timespent в фиче, retention в фичу, число добавлений статусов/участие в чате.</p></div>
+      </div>
+        </div>
+        <div class="slide-proto">
+          <div class="phone-shell"><iframe loading="lazy" title="люди рядом" src="prototypes/f3-people.html?v=3"></iframe></div>
+          <a class="open-proto" href="prototypes/f3-people.html?v=3" target="_blank" rel="noopener">открыть прототип ↗</a>
+        </div>
+      </section>
+      <section class="slide" aria-label="04 шар судьбы">
+        <div class="slide-text">
+<div class="num">04 – шар судьбы</div>
+      <h2>рекомендации в друзья по тем, с кем вы реально пересекаетесь</h2>
+      <p class="lede">Раз в день Blink показывает подборку людей, с которыми стоит познакомиться. Обычные рекомендации «вы можете быть знакомы» строятся только на общих друзьях – мы добавляем <b>геоданные</b>: с кем ты чаще всего оказываешься рядом и как надолго. Где именно вы пересеклись, приложение <b>не показывает никогда</b> – это вопрос приватности.</p>
+      <div class="points">
+        <div class="point"><span class="k win">зачем это нужно</span><p>Друзья друзей и «частые незнакомцы» – те, с кем реальнее всего подружиться, но обычные рекомендации их не находят. А форма «шара судьбы» превращает сухую подсказку в то, что <b>хочется открывать каждый день</b>.</p></div>
+        <div class="point"><span class="k risk">риски</span><p>Happn показывает само место встречи и этим пугает. Мы показываем только саму рекомендацию – без места и времени.</p></div>
+        <div class="point"><span class="k metric">целевые метрики</span><p>доля принятых заявок из шара, новых друзей на пользователя в неделю, среднее число друзей на юзера.</p></div>
+      </div>
+        </div>
+        <div class="slide-proto">
+          <div class="phone-shell"><iframe loading="lazy" title="шар судьбы" src="prototypes/f4-orb.html?v=3"></iframe></div>
+          <a class="open-proto" href="prototypes/f4-orb.html?v=3" target="_blank" rel="noopener">открыть прототип ↗</a>
+        </div>
+      </section>
+      <section class="slide" aria-label="05 захват мест">
+        <div class="slide-text">
+<div class="num">05 – захват мест</div>
+      <h2>места на карте, которые захватываются компанией друзей</h2>
+      <p class="lede">У знаковых зданий города есть 3D-модели, и их можно захватить. Встань у места вдвоём с другом и сделайте <b>совместный трях</b> – место ваше, и это видят все. Отобрать его может только компания больше вашей: если владельцев восемь – нужно тряхнуться вдевятером.</p>
+      <div class="points">
+        <div class="point"><span class="k win">зачем это нужно</span><p>У компании появляется общая цель в офлайне: собраться у места и удержать его. Владение видно каждому на карте – <b>это статус, за который борются</b>, а отобранное место – готовый повод собраться снова и привлечь новых друзей в Blink.</p></div>
+        <div class="point"><span class="k risk">риски</span><p>Малое количество зданий в небольших городах может вызывать негатив. Есть предел, после которого перехватить здание будет почти нереально (можно решить через необходимость подтверждать владение раз в месяц). При желании можно имитировать посещение и трях и абузить механику</p></div>
+        <div class="point"><span class="k metric">целевые метрики</span><p>захватов в неделю, размер компании на захват, приглашенные для захвата юзеры.</p></div>
+      </div>
+        </div>
+        <div class="slide-proto">
+          <div class="phone-shell"><iframe loading="lazy" title="захват мест" src="prototypes/f5-places.html?v=3"></iframe></div>
+          <a class="open-proto" href="prototypes/f5-places.html?v=3" target="_blank" rel="noopener">открыть прототип ↗</a>
+        </div>
+      </section>
+  </div>
+</main>
+
+<nav class="pager" aria-label="навигация по слайдам">
+  <button class="arrow" id="prev" aria-label="назад"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+  <div class="tabs" id="tabs">
+        <button class="tab" data-i="0"><span class="tn">01</span><span class="tl">чаты событий</span></button>
+        <button class="tab" data-i="1"><span class="tn">02</span><span class="tl">события рядом</span></button>
+        <button class="tab" data-i="2"><span class="tn">03</span><span class="tl">люди рядом</span></button>
+        <button class="tab" data-i="3"><span class="tn">04</span><span class="tl">шар судьбы</span></button>
+        <button class="tab" data-i="4"><span class="tn">05</span><span class="tl">захват мест</span></button>
+  </div>
+  <button class="arrow" id="next" aria-label="вперёд"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></button>
+</nav>
+
+<script>
+(function(){
+  var N=5, i=0;
+  var track=document.getElementById('track'), tabs=[].slice.call(document.querySelectorAll('.tab'));
+  var prev=document.getElementById('prev'), next=document.getElementById('next'), cnum=document.getElementById('cnum');
+  // scale the 740px device down so the whole slide fits the viewport with no scroll
+  function fitPhone(){
+    var s;
+    if(window.innerWidth<=820){                    // мобайл: масштаб от ширины, слайд скроллится
+      s=Math.max(.6, Math.min(1, (window.innerWidth-40)/360));
+    } else {
+      var deckH=window.innerHeight-60-84;          // minus top bar + pager
+      var avail=deckH-58;                          // minus slide padding + open-proto link + gaps
+      s=Math.max(.62, Math.min(1, avail/740));
+    }
+    document.documentElement.style.setProperty('--pscale', s.toFixed(3));
+  }
+  fitPhone();
+  window.addEventListener('resize', fitPhone);
+  function render(){
+    track.style.transform='translateX(-'+(i*20)+'%)';
+    tabs.forEach(function(t,k){ t.classList.toggle('on',k===i); t.setAttribute('aria-current', k===i?'true':'false'); });
+    cnum.textContent=('0'+(i+1)).slice(-2);
+    prev.disabled=(i===0); next.disabled=(i===N-1);
+  }
+  function go(n){ i=Math.max(0,Math.min(N-1,n)); render(); }
+  tabs.forEach(function(t){ t.addEventListener('click',function(){ go(+t.dataset.i); }); });
+  prev.addEventListener('click',function(){ go(i-1); });
+  next.addEventListener('click',function(){ go(i+1); });
+  document.addEventListener('keydown',function(e){ if(e.key==='ArrowRight'||e.key==='PageDown'){ go(i+1); } else if(e.key==='ArrowLeft'||e.key==='PageUp'){ go(i-1); } });
+  render();
+})();
+</script>
+</body>
+</html>

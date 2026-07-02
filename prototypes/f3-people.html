@@ -1,0 +1,778 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>blink · люди рядом</title>
+<link rel="stylesheet" href="shared.css?v=4" />
+<style>
+/* ===== F3 — люди рядом (карта + лента) ===== */
+
+/* pannable world: map + pins */
+#f3 .f3-world{position:absolute; inset:0; z-index:1}
+#f3 .f3-world.anim{transition:transform .55s var(--ease)}
+#f3 .f3-mapimg{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; object-position:50% 30%}
+
+/* person pin — squircle avatar + white 2-line status bubble (Pin + status.png) */
+#f3 .f3-p{position:absolute; transform:translate(-50%,-100%); display:flex; flex-direction:column; align-items:center; z-index:4; cursor:pointer; transition:opacity .35s var(--ease), transform .35s var(--ease)}
+#f3 .f3-p .bub{position:relative; width:max-content; max-width:148px; background:#fff; color:#111; font-family:var(--font-body); font-size:11.5px; font-weight:600; line-height:1.28; padding:7px 11px; border-radius:14px; text-align:center; box-shadow:0 6px 16px rgba(0,0,0,.28); margin-bottom:9px;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden}
+#f3 .f3-p .bub::after{content:""; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%); width:0;height:0; border-left:6px solid transparent; border-right:6px solid transparent; border-top:6px solid #fff}
+#f3 .f3-p .avw{position:relative}
+#f3 .f3-p .sq{width:48px; height:48px; border-radius:16px; object-fit:cover; border:3px solid #fff; box-shadow:0 5px 14px rgba(0,0,0,.3); display:block; background:#ddd}
+#f3 .f3-p.online .avw::after{content:""; position:absolute; right:-3px; bottom:-3px; width:14px; height:14px; border-radius:50%; background:var(--green); border:2.5px solid #fff}
+#f3 .f3-p.you .sq{border-color:var(--green)}
+#f3 .f3-p.you{z-index:5}
+#f3 .f3-p.you .bub{background:var(--green); box-shadow:0 6px 18px rgba(95,247,128,.35)}
+#f3 .f3-p.you .bub::after{border-top-color:var(--green)}
+#f3 .f3-p .ttl{position:absolute; left:50%; transform:translateX(-50%); bottom:-9px; background:#111; color:#fff; font-family:var(--font-body); font-size:9.5px; font-weight:700; padding:2px 7px; border-radius:8px; white-space:nowrap; border:1.5px solid #fff}
+#f3 .f3-edit{position:absolute; right:-10px; top:-10px; width:26px; height:26px; border-radius:9px; background:#111; border:2px solid #fff; display:flex; align-items:center; justify-content:center; cursor:pointer; z-index:2; padding:0}
+#f3 .f3-edit svg{width:12px; height:12px}
+
+/* focus state */
+#f3 .f3-scr.focus-on .f3-p:not(.foc):not(.you){opacity:.25; filter:saturate(.5)}
+#f3 .f3-scr.focus-on .f3-p.foc{transform:translate(-50%,-100%) scale(1.12)}
+
+/* mini-event pin */
+#f3 .f3-p.ev .duo{display:flex}
+#f3 .f3-p.ev .duo .sq{width:42px; height:42px; border-radius:14px}
+#f3 .f3-p.ev .duo .sq+.sq{margin-left:-14px}
+#f3 .f3-p.ev .bub{background:var(--green)}
+#f3 .f3-p.ev .bub::after{border-top-color:var(--green)}
+
+/* top nav — buttons from around-icons/PA (46px, rx12, black 40%) */
+#f3 .f3-topnav{position:absolute; left:0; right:0; top:48px; z-index:7; display:flex; align-items:center; gap:9px; padding:6px 16px}
+#f3 .f3-place{flex:1; font-weight:800; font-size:28px; letter-spacing:-.8px; text-transform:lowercase; color:#111}
+#f3 .f3-sq{width:46px; height:46px; border:none; border-radius:12px; background:rgba(0,0,0,.4); backdrop-filter:blur(10px); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:.12s}
+#f3 .f3-sq:active{transform:scale(.94)}
+#f3 .f3-sq svg{width:20px; height:20px}
+
+/* locate — around-icons/SquareButton.svg (crosshair target) */
+#f3 .f3-locate{position:absolute; right:14px; bottom:236px; z-index:8; width:46px; height:46px; border:none; border-radius:12px; background:rgba(0,0,0,.4); backdrop-filter:blur(10px); display:flex; align-items:center; justify-content:center; cursor:pointer; transition:.12s}
+#f3 .f3-locate:active{transform:scale(.92)}
+#f3 .f3-locate svg{width:28px; height:28px}
+
+/* панель: чат — главный экран, список людей — вложенный (push-переход) */
+#f3 .f3-views{flex:1; position:relative; overflow:hidden; min-height:0}
+#f3 .f3-view{position:absolute; inset:0; display:flex; flex-direction:column; transition:transform .38s var(--ease); background:#0b0b0c}
+#f3 .f3-view.chatv{transform:translateX(0)}
+#f3 .f3-view.peoplev{transform:translateX(103%)}
+#f3 .f3-views.people .chatv{transform:translateX(-26%)}
+#f3 .f3-views.people .peoplev{transform:translateX(0)}
+/* чип «N рядом» с фейспайлом — вход в список */
+#f3 .f3-pchip{height:38px; border:none; border-radius:var(--r-pill); background:var(--surface-2); display:flex; align-items:center; gap:7px; padding:0 11px 0 6px; cursor:pointer; flex:none; transition:.12s}
+#f3 .f3-pchip:active{transform:scale(.96)}
+#f3 .f3-pchip .fp{display:flex}
+#f3 .f3-pchip .fp img{width:24px; height:24px; border-radius:50%; border:2px solid #0b0b0c; margin-left:-8px; object-fit:cover}
+#f3 .f3-pchip .fp img:first-child{margin-left:0}
+#f3 .f3-pchip b{font-family:var(--font-body); font-weight:700; font-size:13px; color:#fff; white-space:nowrap}
+#f3 .f3-pchip svg{width:13px; height:13px; flex:none}
+/* лайв чат */
+#f3 .f3-msgs{flex:1; overflow-y:auto; padding:2px 14px 10px; display:flex; flex-direction:column; gap:7px}
+#f3 .f3-msgs::-webkit-scrollbar{width:0}
+#f3 .f3-msgs .bubble{font-size:14px; border-radius:18px}
+#f3 .f3-msgs .bubble.in{background:#242424; color:#fff}
+#f3 .f3-msgs .bubble.me{background:#fff; color:#0a0a0a}
+#f3 .f3-msgs .who{color:#8a8a93}
+
+/* ===== bottom panel: лента-дублёр карты ===== */
+#f3 .f3-panel{position:absolute; left:0; right:0; bottom:0; height:218px; z-index:9; background:#0b0b0c; border-radius:22px 22px 0 0; box-shadow:0 -14px 44px rgba(0,0,0,.5); display:flex; flex-direction:column; transition:height .42s var(--ease), transform .42s var(--ease)}
+#f3 .f3-panel.up{height:66%}
+#f3 .f3-panel.hidden{transform:translateY(106%)}
+#f3 .f3-panel.drag{transition:none}
+#f3 .f3-panel .grab{cursor:grab; touch-action:none}
+#f3 .f3-phd{touch-action:none; cursor:grab}
+#f3 .f3-phd button{cursor:pointer}
+#f3 .f3-phd{display:flex; align-items:center; gap:8px; padding:4px 16px 10px; flex:none}
+#f3 .f3-phd b{font-weight:800; font-size:19px; letter-spacing:-.3px; text-transform:lowercase; color:#fff}
+#f3 .f3-phd .cnt{font-family:var(--font-body); font-weight:700; font-size:17px; color:#7a7a82}
+#f3 .f3-phd .sp{flex:1}
+#f3 .f3-hb{width:38px; height:38px; border:none; border-radius:12px; background:var(--surface-2); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:.12s; position:relative}
+#f3 .f3-hb:active{transform:scale(.92)}
+#f3 .f3-hb svg{width:18px; height:18px}
+#f3 .f3-hb .fdot{position:absolute; right:6px; top:6px; width:7px; height:7px; border-radius:50%; background:var(--green); display:none}
+#f3 .f3-hb.on .fdot{display:block}
+#f3 .f3-hb.spin svg{animation:f3rot .7s linear}
+@keyframes f3rot{to{transform:rotate(360deg)}}
+
+/* композер — как в чате первого прототипа (элементы из input_chat/) */
+#f3 .f3-comp{flex:none; display:flex; align-items:center; gap:9px; padding:0 12px 14px}
+#f3 .f3c-aa{width:44px; height:44px; border-radius:14px; border:2px solid rgba(255,255,255,.15); background:rgba(255,255,255,.25); color:#fff; cursor:pointer; flex:none; display:flex; align-items:center; justify-content:center}
+#f3 .f3c-aa svg{width:26px; height:26px}
+#f3 .f3c-input{flex:1; min-width:0; height:44px; border-radius:14px; background:rgba(255,255,255,.25); display:flex; align-items:center; padding:0 6px 0 14px; gap:6px; border:2px solid rgba(255,255,255,.15); transition:border-color .15s var(--ease), box-shadow .15s var(--ease)}
+#f3 .f3c-input:focus-within{border-color:rgba(255,255,255,.38)}
+#f3 .f3c-input input{flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-family:var(--font-body); font-size:16px}
+#f3 .f3c-input input::placeholder{color:var(--text-placeholder)}
+#f3 .f3c-stk{width:32px; height:32px; border:none; background:none; color:rgba(255,255,255,.3); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none}
+#f3 .f3c-stk svg{width:24px; height:24px}
+#f3 .f3c-sq{width:44px; height:44px; border-radius:14px; border:2px solid rgba(255,255,255,.15); background:rgba(255,255,255,.25); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:.12s}
+#f3 .f3c-sq svg{width:24px; height:24px}
+#f3 .f3c-sq:active{transform:scale(.94)}
+#f3 .f3c-mic.sending{background:#fff}
+#f3 .f3c-mic.sending .ic-mic{display:none}
+#f3 .f3c-mic.sending .ic-send{display:block !important}
+
+#f3 .f3-list{flex:1; overflow-y:auto; padding:0 8px 12px; -webkit-overflow-scrolling:touch}
+#f3 .f3-list::-webkit-scrollbar{width:0}
+#f3 .f3-row{display:flex; align-items:center; gap:11px; padding:8px 8px; border-radius:14px; transition:background .12s}
+#f3 .f3-row:active{background:rgba(255,255,255,.04)}
+#f3 .f3-row .avw{position:relative; flex:none}
+#f3 .f3-row .sqa{width:44px; height:44px; border-radius:14px; object-fit:cover; display:block; background:#222}
+#f3 .f3-row.online .avw::after{content:""; position:absolute; right:-2px; bottom:-2px; width:12px; height:12px; border-radius:50%; background:var(--green); border:2.5px solid #0b0b0c}
+#f3 .f3-row .meta{flex:1; min-width:0; line-height:1.25}
+#f3 .f3-row .meta b{display:block; font-weight:700; font-size:15px; color:#fff; text-transform:lowercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+#f3 .f3-row .meta span{display:block; font-family:var(--font-body); font-size:12.5px; color:#8a8a93; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+#f3 .f3-row .meta span.on{color:var(--green)}
+/* row buttons — around-icons/ContactCard (48×36, rx12) */
+#f3 .f3-rb{width:48px; height:36px; border:none; border-radius:12px; background:none; padding:0; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:.12s}
+#f3 .f3-rb:active{transform:scale(.92)}
+#f3 .f3-rb svg{width:48px; height:36px; display:block}
+#f3 .f3-rb.msg{background:#1A1A1A}
+#f3 .f3-rb.snd{background:transparent; border:1px solid #494949}
+#f3 .f3-rb.snd.sent{border-color:rgba(95,247,128,.5); background:var(--green-tint)}
+#f3 .f3-rb.snd.sent svg path{fill:var(--green); opacity:1}
+#f3 .f3-empty{padding:26px 16px; text-align:center; font-family:var(--font-body); font-size:13.5px; color:#8a8a93}
+
+/* ===== focus card (Modal _ Profile.png) ===== */
+#f3 .f3-fcard{position:absolute; left:0; right:0; bottom:0; z-index:11; background:#0b0b0c; border-radius:22px 22px 0 0; box-shadow:0 -20px 60px rgba(0,0,0,.6); transform:translateY(104%); transition:transform .42s var(--ease); padding:0 20px 22px}
+#f3 .f3-fcard.open{transform:translateY(0)}
+#f3 .f3-fst{font-family:var(--font-body); font-weight:600; font-size:20px; line-height:1.3; color:#fff; margin:10px 0 18px}
+#f3 .f3-fst.none{color:#8a8a93; font-size:16px}
+#f3 .f3-frow{display:flex; align-items:center; gap:12px}
+#f3 .f3-frow .sqa{width:52px; height:52px; border-radius:17px; object-fit:cover; flex:none}
+#f3 .f3-frow .nm{flex:1; min-width:0; font-family:var(--font-body); font-weight:700; font-size:19px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+#f3 .f3-fbtn{height:48px; padding:0 20px; border:none; border-radius:16px; background:var(--surface-2); color:#fff; font-family:var(--font-ui); font-weight:700; font-size:15px; letter-spacing:.6px; cursor:pointer; flex:none; transition:.12s}
+#f3 .f3-fbtn:active{transform:scale(.95)}
+#f3 .f3-fmsg{width:48px; height:48px; padding:0; display:flex; align-items:center; justify-content:center}
+#f3 .f3-fmsg svg{width:21px; height:21px}
+#f3 .f3-fdiv{height:1px; background:rgba(255,255,255,.09); margin:16px 0 13px}
+#f3 .f3-fmut{display:flex; align-items:center; gap:10px; font-family:var(--font-body); font-size:15px; color:#8a8a93}
+#f3 .f3-fmut .fp{display:flex}
+#f3 .f3-fmut .fp img{width:26px; height:26px; border-radius:50%; border:2px solid #0b0b0c; margin-left:-8px; object-fit:cover}
+#f3 .f3-fmut .fp img:first-child{margin-left:0}
+#f3 .f3-fmut .fp .more{width:26px; height:26px; border-radius:50%; background:var(--surface-3); border:2px solid #0b0b0c; margin-left:-8px; color:#fff; font-family:var(--font-body); font-weight:700; font-size:9.5px; display:flex; align-items:center; justify-content:center}
+/* one-tap replies */
+#f3 .f3-qr{display:flex; gap:8px; margin-top:16px}
+#f3 .f3-qchip{height:42px; padding:0 15px; border:1px solid var(--border-subtle); border-radius:13px; background:var(--surface-2); color:#fff; font-family:var(--font-body); font-weight:600; font-size:13.5px; cursor:pointer; transition:.15s; white-space:nowrap}
+#f3 .f3-qchip.em{width:42px; padding:0; font-size:17px}
+#f3 .f3-qchip:active{transform:scale(.94)}
+#f3 .f3-qchip.sent{background:var(--green); border-color:var(--green); color:#000}
+
+/* ===== sheets: filters / my status / share ===== */
+#f3 .sheet{background:#0b0b0c}
+/* закрытые шиты уезжают вниз за экран — их тень не должна затемнять панель */
+#f3 .sheet:not(.open){box-shadow:none}
+#f3 .f3-fcard:not(.open){box-shadow:none}
+#f3 .sh-body{padding:2px 20px 24px}
+#f3 .sh-t{font-weight:800; font-size:20px; letter-spacing:-.4px; text-transform:lowercase; color:#fff; padding-top:4px}
+#f3 .sh-s{font-family:var(--font-body); font-size:12.5px; color:#8a8a93; margin:3px 0 12px}
+#f3 .sh-lbl{font-family:var(--font-body); font-weight:700; font-size:12px; color:#8a8a93; text-transform:lowercase; letter-spacing:.3px; margin:12px 0 7px}
+#f3 .sh-lbl:first-of-type{margin-top:2px}
+#f3 .chips{display:flex; flex-wrap:wrap; gap:8px}
+#f3 .chip{height:38px; padding:0 15px; border:1px solid var(--border-subtle); border-radius:12px; background:var(--surface-2); color:#fff; font-family:var(--font-ui); font-weight:600; font-size:13px; text-transform:lowercase; cursor:pointer; transition:.13s}
+#f3 .chip:active{transform:scale(.96)}
+#f3 .chip.sel{background:var(--green); border-color:var(--green); color:#000}
+/* пресеты статусов — компактнее */
+#f3 #f3presets{gap:6px}
+#f3 #f3presets .chip{height:32px; padding:0 12px; font-size:12.5px; border-radius:10px}
+#f3 .f3-cust{margin-top:8px; height:40px; border-radius:12px; background:var(--surface-2); border:1px solid var(--border-subtle); display:flex; align-items:center; padding:0 14px; transition:border-color .15s var(--ease)}
+#f3 .f3-cust:focus-within{border-color:rgba(95,247,128,.55)}
+#f3 .f3-cust input{flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-family:var(--font-body); font-size:14px}
+#f3 .f3-cust input::placeholder{color:var(--text-placeholder)}
+#f3 .sh-cta{margin-top:14px; width:100%; height:52px; border:none; border-radius:var(--r-cta); background:var(--green); color:#000; font-family:var(--font-ui); font-weight:700; font-size:15px; text-transform:lowercase; cursor:pointer; transition:.12s}
+#f3 .sh-cta:active{transform:scale(.98)}
+#f3 .sh-cta:disabled{background:var(--surface-3); color:#7a7a82}
+
+/* dual range (давность статуса) */
+#f3 .f3-range{position:relative; height:40px; margin:6px 6px 0}
+#f3 .f3-range .track{position:absolute; left:0; right:0; top:18px; height:4px; border-radius:2px; background:var(--surface-3)}
+#f3 .f3-range .fill{position:absolute; top:18px; height:4px; border-radius:2px; background:var(--green)}
+#f3 .f3-range .th{position:absolute; top:7px; width:26px; height:26px; border-radius:50%; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.4); transform:translateX(-50%); cursor:grab; touch-action:none}
+#f3 .f3-rangeval{font-family:var(--font-body); font-size:13px; font-weight:600; color:#fff; margin-top:2px}
+
+/* share card (статус как приглашение) */
+#f3 .f3-shcard{position:relative; border-radius:18px; overflow:hidden; height:158px; margin-bottom:14px; border:1px solid var(--border-subtle)}
+#f3 .f3-shcard>img.bgm{position:absolute; inset:0; width:100%; height:100%; object-fit:cover; filter:saturate(.9)}
+#f3 .f3-shcard .ov{position:absolute; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.05), rgba(0,0,0,.62) 78%); display:flex; flex-direction:column; justify-content:flex-end; padding:14px}
+#f3 .f3-shcard .who{display:flex; align-items:center; gap:9px}
+#f3 .f3-shcard .who img{width:34px; height:34px; border-radius:12px; border:2px solid #fff; object-fit:cover}
+#f3 .f3-shcard .who b{font-family:var(--font-body); font-weight:700; font-size:14.5px; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.5)}
+#f3 .f3-shcard .stx{font-family:var(--font-body); font-weight:600; font-size:15.5px; color:#fff; margin-top:7px; text-shadow:0 1px 4px rgba(0,0,0,.5)}
+#f3 .f3-shcard .lnk{position:absolute; top:12px; right:12px; background:rgba(0,0,0,.55); backdrop-filter:blur(6px); color:#fff; font-family:var(--font-body); font-weight:600; font-size:11px; padding:5px 9px; border-radius:9px}
+#f3 .f3-shbtns{display:flex; gap:9px}
+#f3 .f3-shbtns .sh-cta{margin-top:0; flex:1}
+#f3 .f3-shbtns .sh-cta.gray{background:var(--surface-2); color:#fff}
+
+/* toast */
+#f3 .f3-toast{position:absolute; left:50%; top:62px; transform:translate(-50%,-8px); z-index:14; background:var(--surface-3); color:#fff; font-family:var(--font-body); font-weight:600; font-size:12.5px; padding:9px 16px; border-radius:var(--r-pill); box-shadow:0 8px 24px rgba(0,0,0,.45); opacity:0; visibility:hidden; transition:.28s var(--ease); pointer-events:none; max-width:320px; text-align:center}
+#f3 .f3-toast.show{opacity:1; visibility:visible; transform:translate(-50%,0)}
+
+</style>
+</head>
+<body class="proto-body">
+
+<div id="f3">
+<div class="fproto">
+      <div class="phonewrap"><div class="phone"><div class="stage">
+        <div class="screen active imgscreen f3-scr" data-screen="f3-map" id="f3scr">
+
+          <!-- world: map + pins -->
+          <div class="f3-world" id="f3world">
+            <img class="f3-mapimg" src="../el/map.png" alt="карта"/>
+            <div id="f3pins"></div>
+            <!-- you -->
+            <div class="f3-p you online" id="f3you" style="left:196px; top:452px">
+              <div class="bub" id="f3mybub" style="display:none"></div>
+              <div class="avw">
+                <img class="sq" src="../assets/faces/av12.jpg" alt="ты"/>
+                <button class="f3-edit" id="f3editbtn" aria-label="мой статус"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/></svg></button>
+                <span class="ttl" id="f3myttl" style="display:none"></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- status bar (light map -> dark) -->
+          <div class="notch"></div>
+          <div class="sb onmap"><span class="sb-time" style="color:#111">9:41</span><span class="sb-r" data-dark><svg width="18" height="12" viewBox="0 0 18 12" fill="#111"><rect x="0" y="7.5" width="3" height="4.5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="#111"><path d="M8.5 2.2c2.5 0 4.8 1 6.4 2.6l-1.5 1.5A7 7 0 0 0 8.5 4.3 7 7 0 0 0 3.6 6.4L2.1 4.8A9 9 0 0 1 8.5 2.2zm0 3.6c1.6 0 3 .6 4 1.7L11 9A4 4 0 0 0 8.5 7.9 4 4 0 0 0 6 9L4.5 7.5a5.6 5.6 0 0 1 4-1.7zm0 3.4 1.7 1.8H6.8z"/></svg><svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x="1" y="1" width="21" height="11" rx="3.2" stroke="#111" stroke-opacity=".45"/><rect x="2.6" y="2.6" width="16.5" height="7.8" rx="1.8" fill="#111"/><path d="M23.6 4.7c.9.3.9 3.3 0 3.6z" fill="#111" fill-opacity=".5"/></svg></span></div>
+
+          <!-- top nav -->
+          <div class="f3-topnav">
+            <div class="f3-place">садовая</div>
+            <button class="f3-sq" id="f3gear" aria-label="настройки"><svg viewBox="13 13 20 20" fill="none"><path d="M32.411 21.0547L30.1819 20.6761C30.0557 20.2764 29.8874 19.898 29.6982 19.5194L31.002 17.6898C31.1913 17.4163 31.1703 17.0379 30.939 16.8065L29.1513 15.0188C28.92 14.7875 28.5415 14.7454 28.268 14.9557L26.4384 16.2596C26.0809 16.0704 25.6813 15.9021 25.2817 15.7759L24.9242 13.5679C24.8611 13.2313 24.5877 13 24.2512 13H21.7276C21.3911 13 21.1178 13.2313 21.0545 13.5679L20.6761 15.797C20.2764 15.9232 19.898 16.0915 19.5194 16.2807L17.6898 14.9769C17.4163 14.7876 17.0379 14.8086 16.8065 15.0399L15.0188 16.8276C14.7875 17.0589 14.7454 17.4374 14.9557 17.7109L16.2596 19.5405C16.0704 19.898 15.9021 20.2976 15.7759 20.6972L13.5679 21.0547C13.2313 21.1177 13 21.3912 13 21.7277V24.2513C13 24.5878 13.2313 24.8611 13.5679 24.9244L15.797 25.3028C15.9232 25.7024 16.0915 26.0809 16.2807 26.4595L14.9769 28.2891C14.7876 28.5626 14.8086 28.941 15.0399 29.1724L16.8276 30.9601C17.0589 31.1914 17.4374 31.2335 17.7109 31.0231L19.5405 29.7193C19.898 29.9085 20.2976 30.0768 20.6972 30.203L21.0756 32.4321C21.1387 32.7687 21.4122 33 21.7487 33H24.2723C24.6088 33 24.8821 32.7687 24.9453 32.4321L25.3028 30.1818C25.7024 30.0557 26.0809 29.8874 26.4595 29.6982L28.2891 31.002C28.5626 31.1912 28.941 31.1703 29.1724 30.9389L30.9601 29.1513C31.1914 28.9199 31.2335 28.5415 31.0231 28.268L29.7193 26.4384C29.9085 26.0809 30.0768 25.6813 30.203 25.2817L32.4321 24.9032C32.7687 24.8401 33 24.5667 33 24.2302L32.9999 21.7275C32.9789 21.3912 32.7475 21.1177 32.411 21.0546L32.411 21.0547ZM22.9894 26.5857C20.9916 26.5857 19.3932 24.9663 19.3932 22.9894C19.3932 20.9916 21.0126 19.3931 22.9894 19.3931C24.9663 19.3931 26.5857 20.9915 26.5857 22.9894C26.5857 24.9873 24.9873 26.5857 22.9894 26.5857Z" fill="#fff"/></svg></button>
+            <button class="f3-sq" aria-label="закрыть"><svg viewBox="13 13 20 20" fill="none"><path d="M31.0627 18.4769L27.2446 22.2949L26.5375 23.002L27.2446 23.7091L31.0627 27.5271C31.4532 27.9176 31.4532 28.5508 31.0627 28.9413L28.9413 31.0627C28.5508 31.4532 27.9176 31.4532 27.5271 31.0627L23.7091 27.2446L23.002 26.5375L22.2949 27.2446L18.4769 31.0627C18.0863 31.4532 17.4532 31.4532 17.0627 31.0627L14.9413 28.9413C14.5508 28.5508 14.5508 27.9176 14.9413 27.5271L18.7594 23.7091L19.4665 23.002L18.7593 22.2949L14.9413 18.4769C14.5508 18.0863 14.5508 17.4532 14.9413 17.0627L17.0627 14.9413C17.4532 14.5508 18.0863 14.5508 18.4769 14.9413L22.2949 18.7594L23.002 19.4665L23.7091 18.7593L27.5271 14.9413C27.9176 14.5508 28.5508 14.5508 28.9413 14.9413L31.0627 17.0627C31.4532 17.4532 31.4532 18.0863 31.0627 18.4769Z" fill="#fff"/></svg></button>
+          </div>
+
+          <!-- locate -->
+          <button class="f3-locate" id="f3locate" aria-label="моё местоположение"><svg viewBox="9 9 28 28" fill="none"><path d="M35 24.5C35.8284 24.5 36.5 23.8284 36.5 23C36.5 22.1716 35.8284 21.5 35 21.5L35 23L35 24.5ZM32 23L32 24.5L35 24.5L35 23L35 21.5L32 21.5L32 23Z" fill="#fff"/><path d="M11 24.5C10.1716 24.5 9.5 23.8284 9.5 23C9.5 22.1716 10.1716 21.5 11 21.5L11 23L11 24.5ZM14 23L14 24.5L11 24.5L11 23L11 21.5L14 21.5L14 23Z" fill="#fff"/><path d="M24.5 35C24.5 35.8284 23.8284 36.5 23 36.5C22.1716 36.5 21.5 35.8284 21.5 35L23 35L24.5 35ZM23 32L24.5 32L24.5 35L23 35L21.5 35L21.5 32L23 32Z" fill="#fff"/><path d="M24.5 11C24.5 10.1716 23.8284 9.5 23 9.5C22.1716 9.5 21.5 10.1716 21.5 11L23 11L24.5 11ZM23 14L24.5 14L24.5 11L23 11L21.5 11L21.5 14L23 14Z" fill="#fff"/><circle cx="23" cy="23" r="2" fill="#fff"/><path d="M23 14.5C27.6944 14.5 31.5 18.3056 31.5 23C31.5 27.6944 27.6944 31.5 23 31.5C18.3056 31.5 14.5 27.6944 14.5 23C14.5 18.3056 18.3056 14.5 23 14.5Z" stroke="#fff" stroke-width="3"/></svg></button>
+
+          <!-- bottom panel: лента-дублёр -->
+          <div class="f3-panel" id="f3panel">
+            <div class="grab" id="f3grab"></div>
+            <div class="f3-views" id="f3views">
+              <!-- лайв чат: главный экран щита -->
+              <div class="f3-view chatv">
+                <div class="f3-phd">
+                  <b>лайв чат</b>
+                  <span class="sp"></span>
+                  <button class="f3-pchip" id="f3peoplebtn" aria-label="люди рядом">
+                    <span class="fp" id="f3fp"><img src="../assets/faces/av15.jpg"><img src="../assets/faces/av26.jpg"><img src="../assets/faces/av53.jpg"></span>
+                    <b id="f3pplcnt">10 рядом</b>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#8a8a93" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+                  </button>
+                </div>
+                <div class="f3-msgs" id="f3msgs"></div>
+                <div class="f3-comp">
+                  <button class="f3c-aa" aria-label="формат"><svg viewBox="8 8 28 28" fill="none"><path d="M11.5625 29.291C10.2441 29.291 9.45312 28.5391 9.45312 27.2891C9.45312 26.9277 9.56055 26.4004 9.74609 25.9023L12.9004 17.1914C13.5059 15.4824 14.5312 14.7109 16.1816 14.7109C17.9492 14.7109 18.9648 15.4531 19.5996 17.1914L22.7832 25.9023C22.9785 26.4395 23.0566 26.8301 23.0566 27.2793C23.0566 28.4512 22.1875 29.291 20.9863 29.291C19.7656 29.291 19.1309 28.7344 18.7793 27.3672L18.5352 26.4102H13.9453L13.7012 27.2988C13.3105 28.7148 12.6855 29.291 11.5625 29.291ZM14.7266 23.3242H17.666L16.2012 18.207H16.123L14.7266 23.3242Z" fill="#fff"/><path d="M27.4414 29.2031C25.4785 29.2031 23.8086 27.8555 23.8086 25.9121C23.8086 23.8418 25.4004 22.7188 28.2812 22.543L30.6445 22.3965V21.8691C30.6445 21.1465 30.0977 20.7559 29.3457 20.7559C28.7207 20.7559 28.4082 20.9219 27.7148 21.5566C27.2461 21.9863 26.7383 22.2012 26.1426 22.2012C25.1953 22.2012 24.5215 21.6152 24.5215 20.7852C24.5215 20.541 24.541 20.3848 24.5996 20.1895C25.0098 18.8125 26.875 17.9922 29.5605 17.9922C32.5488 17.9922 34.5508 19.4863 34.5508 21.6738V27.2793C34.5508 28.666 33.7207 29.291 32.5684 29.291C31.5137 29.291 30.7715 28.7734 30.6445 27.6016H30.5664C30 28.6562 28.6914 29.2031 27.4414 29.2031ZM28.9355 26.5273C29.8242 26.5273 30.6445 26.0293 30.6445 25.2383V24.5352L28.9453 24.6523C28.1836 24.7109 27.7539 25.0723 27.7539 25.5996C27.7539 26.1855 28.2324 26.5273 28.9355 26.5273Z" fill="#fff"/></svg></button>
+                  <div class="f3c-input"><input type="text" placeholder="написать в эфир…" id="f3input"/>
+                    <button class="f3c-stk" aria-label="стикеры"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5s1.3 1.6 3.5 1.6 3.5-1.6 3.5-1.6" stroke-linecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/></svg></button>
+                  </div>
+                  <button class="f3c-sq" aria-label="фото"><svg viewBox="8 8 28 28" fill="none"><circle cx="17.5" cy="18" r="2" fill="#fff"/><path d="M21.6903 22.0796L15 31H30L32.5 29.5L26.4221 21.992C25.1927 20.4733 22.8627 20.5164 21.6903 22.0796Z" fill="#fff" clip-path="url(#f3phclip)"/><rect x="12" y="12" width="20" height="20" rx="5" stroke="#fff" stroke-width="2"/><defs><clipPath id="f3phclip"><rect x="13" y="13" width="18" height="18" rx="4"/></clipPath></defs></svg></button>
+                  <button class="f3c-sq f3c-mic" id="f3send" aria-label="отправить"><svg class="ic-mic" viewBox="8 8 28 28" fill="none"><path d="M30 23.125C30 26.975 25.85 30.125 22 30.125M22 30.125C18.15 30.125 14 26.975 14 23.125M22 30.125V34.0002" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 21.9375V15C18 13.3431 19.3431 12 21 12H22.9999C24.6568 12 25.9999 13.3431 25.9999 15V21.9375C25.9999 24.1875 24.1875 26 22 26C19.8125 26 18 24.1375 18 21.9375Z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="ic-send" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+                </div>
+              </div>
+              <!-- люди рядом: вложенный экран со своим тулбаром -->
+              <div class="f3-view peoplev">
+                <div class="f3-phd">
+                  <button class="f3-hb" id="f3back" aria-label="назад"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+                  <b>люди рядом</b><span class="cnt" id="f3count">0</span>
+                  <span class="sp"></span>
+                  <button class="f3-hb" id="f3filterbtn" aria-label="настройка выдачи"><svg viewBox="0 0 24 24" fill="none"><path d="M15.0011 19.88C15.0411 20.18 14.9411 20.5 14.7111 20.71C14.6186 20.8027 14.5087 20.8762 14.3877 20.9264C14.2668 20.9766 14.1371 21.0024 14.0061 21.0024C13.8751 21.0024 13.7455 20.9766 13.6245 20.9264C13.5035 20.8762 13.3936 20.8027 13.3011 20.71L9.29111 16.7C9.18211 16.5933 9.09922 16.4629 9.04892 16.319C8.99861 16.175 8.98225 16.0213 9.00111 15.87V10.75L4.21111 4.62C4.04872 4.41153 3.97544 4.14726 4.0073 3.88493C4.03915 3.6226 4.17354 3.38355 4.38111 3.22C4.57111 3.08 4.78111 3 5.00111 3H19.0011C19.2211 3 19.4311 3.08 19.6211 3.22C19.8287 3.38355 19.9631 3.6226 19.9949 3.88493C20.0268 4.14726 19.9535 4.41153 19.7911 4.62L15.0011 10.75V19.88ZM7.04111 5L11.0011 10.06V15.58L13.0011 17.58V10.05L16.9611 5H7.04111Z" fill="#fff"/></svg><span class="fdot"></span></button>
+                  <button class="f3-hb" id="f3refresh" aria-label="обновить"><svg viewBox="0 0 24 24" fill="none"><path d="M22.3478 12.7586C22.3478 15.0301 21.583 17.2354 20.1768 19.0192C18.7705 20.8031 16.8046 22.0615 14.5959 22.5918C12.3871 23.1221 10.0642 22.8933 8.00135 21.9423C5.93851 20.9913 4.25591 19.3735 3.22467 17.3496C2.19343 15.3257 1.87362 13.0135 2.31677 10.7857C2.75992 8.55783 3.94021 6.54405 5.66747 5.06883C7.39473 3.59361 9.56835 2.74287 11.8381 2.65369C14.1078 2.56451 16.3415 3.24209 18.1792 4.57724" stroke="#fff" stroke-width="1.83867" stroke-linecap="round" stroke-linejoin="round"/><path d="M18.4088 0.997796L19.5985 5.43783L15.1585 6.62754" stroke="#fff" stroke-width="1.83867" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+                </div>
+                <div class="f3-list" id="f3list"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- focus card -->
+          <div class="f3-fcard" id="f3fcard">
+            <div class="grab" id="f3fclose" style="cursor:pointer"></div>
+            <div class="f3-fst" id="f3fst"></div>
+            <div class="f3-frow">
+              <img class="sqa" id="f3fav" src="../assets/faces/av5.jpg" alt=""/>
+              <div class="nm" id="f3fname"></div>
+              <button class="f3-fbtn" data-sheet="f3prof">ПРОФИЛЬ</button>
+              <button class="f3-fbtn f3-fmsg" id="f3fmsg" aria-label="написать"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2"><path d="M21 11.5a8.5 8.5 0 0 1-12.3 7.6L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/></svg></button>
+            </div>
+            <div class="f3-fdiv"></div>
+            <div class="f3-fmut">
+              <span class="fp" id="f3fpile"></span>
+              <span id="f3fmuttx">6 общих друзей</span>
+            </div>
+            <div class="f3-qr" id="f3qr">
+              <button class="f3-qchip em" data-q="👋">👋</button>
+              <button class="f3-qchip em" data-q="🔥">🔥</button>
+              <button class="f3-qchip" data-q="я тоже рядом">я тоже рядом</button>
+              <button class="f3-qchip" data-q="го!">го!</button>
+            </div>
+          </div>
+
+          <!-- filters: настройка выдачи -->
+          <div class="sheet" data-sheet-id="f3filters">
+            <div class="grab"></div>
+            <div class="sh-body">
+              <div class="sh-t">настройка выдачи</div>
+              <div class="sh-s">кого показывать на карте и в списке</div>
+              <div class="sh-lbl">пол</div>
+              <div class="chips" id="f3sexchips">
+                <button class="chip sel" data-sex="any">любой</button>
+                <button class="chip" data-sex="m">только мужской</button>
+                <button class="chip" data-sex="f">только женский</button>
+              </div>
+              <div class="sh-lbl">возраст <span style="color:#5c5c64">· тебе 23</span></div>
+              <div class="chips" id="f3agechips"></div>
+              <div class="sh-lbl">давность статуса</div>
+              <div class="f3-range" id="f3range">
+                <div class="track"></div>
+                <div class="fill" id="f3fill"></div>
+                <div class="th" id="f3thlo"></div>
+                <div class="th" id="f3thhi"></div>
+              </div>
+              <div class="f3-rangeval" id="f3rangeval">за всё время</div>
+              <button class="sh-cta" id="f3apply">показать · 10</button>
+            </div>
+          </div>
+
+          <!-- my status: интент + срок жизни -->
+          <div class="sheet" data-sheet-id="f3status">
+            <div class="grab"></div>
+            <div class="sh-body">
+              <div class="sh-t">мой статус</div>
+              <div class="sh-s">его увидят все, кто рядом</div>
+              <div class="chips" id="f3presets"></div>
+              <div class="f3-cust"><input type="text" id="f3custom" maxlength="60" placeholder="свой вариант…"/></div>
+              <div class="sh-lbl">на сколько</div>
+              <div class="chips" id="f3ttls">
+                <button class="chip" data-ttl="30 мин">30 мин</button>
+                <button class="chip sel" data-ttl="2 ч">2 часа</button>
+                <button class="chip" data-ttl="до конца дня">до конца дня</button>
+              </div>
+              <button class="sh-cta" id="f3setstatus" disabled>поставить статус</button>
+            </div>
+          </div>
+
+          <!-- share: статус как приглашение наружу -->
+          <div class="sheet" data-sheet-id="f3share">
+            <div class="grab"></div>
+            <div class="sh-body">
+              <div class="sh-t">позови своих</div>
+              <div class="sh-s">карточка со ссылкой: в сторис или другу в чат</div>
+              <div class="f3-shcard">
+                <img class="bgm" src="../el/map.png" alt=""/>
+                <span class="lnk">blink.app/s/yan</span>
+                <div class="ov">
+                  <div class="who"><img src="../assets/faces/av12.jpg" alt=""/><b>yan · садовая</b></div>
+                  <div class="stx" id="f3shtext"></div>
+                </div>
+              </div>
+              <div class="f3-shbtns">
+                <button class="sh-cta" id="f3shstory">в сторис</button>
+                <button class="sh-cta gray" id="f3shcopy">скопировать ссылку</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- profile sheet (real Modal _ Profile element) -->
+          <div class="sheet" data-sheet-id="f3prof">
+            <div class="grab"></div>
+            <img src="../el/profile.png" alt="профиль" style="width:100%; display:block"/>
+            <div class="hot" data-sheet-close style="left:0; right:0; top:0; height:42px"></div>
+          </div>
+
+          <div class="backdrop"></div>
+          <div class="f3-toast" id="f3toast"></div>
+        </div>
+      </div></div></div>
+    </div>
+</div>
+
+<script src="shared.js?v=4"></script>
+<script>
+(function(){
+  var root=document.getElementById('f3'); if(!root) return;
+  var A='../assets/faces/';
+  var W=390, H=844, USER_AGE=23;
+
+  // ---- data ----
+  var PEOPLE=[
+    {id:'danya', u:'danya_belousov', name:'даня',  av:'av5',  g:'m', age:24, online:false, st:'совместный выгул собак? моему бублику нужен друг 🐶', intent:'dogs',  ageMin:25,  dist:'350 м', mutual:6, x:92,  y:212},
+    {id:'nastya', u:'nastya.sk', name:'настя', av:'av26', g:'f', age:22, online:true,  st:'ищу компанию на каток',                            intent:'skate', ageMin:70,  dist:'400 м', mutual:2, x:318, y:236},
+    {id:'lera',  u:'lera.brew', name:'лера',  av:'av36', g:'f', age:23, online:false, st:'сижу в кафе на садовой, го кофе',                        intent:'coffee',ageMin:130, dist:'600 м', mutual:3, x:138, y:540},
+    {id:'gosha', u:'gosha_ln', name:'гоша',  av:'av15', g:'m', age:25, online:true,  st:'кто ещё на районе? 👀',                               intent:null,    ageMin:3,   dist:'250 м', mutual:1, x:62,  y:400},
+    {id:'sonya', u:'sonya.wav', name:'соня',  av:'av53', g:'f', age:21, online:true,  st:'погнали в парк?',                                   intent:'walk',  ageMin:8,   dist:'900 м', mutual:0, x:312, y:478},
+    {id:'mark',  u:'markk', name:'марк',  av:'av44', g:'m', age:27, online:true,  st:null,                                                  intent:null,    ageMin:null,dist:'1.2 км',mutual:4, x:252, y:152},
+    {id:'kira',  u:'kira.night', name:'кира',  av:'av23', g:'f', age:24, online:false, st:'кто сегодня в клуб?',                              intent:'party', ageMin:200, dist:'150 м', mutual:5, x:212, y:318},
+    {id:'timur', u:'timur.run', name:'тимур', av:'av68', g:'m', age:26, online:false, st:'бегу по набережной в 8, догоняй',                            intent:'sport', ageMin:360, dist:'1.4 км',mutual:0, x:345, y:560},
+    {id:'yulya', u:'yulya_z', name:'юля',   av:'av47', g:'f', age:20, online:true,  st:null,                                                  intent:null,    ageMin:null,dist:'2 км',  mutual:0, x:55,  y:568},
+    {id:'vlad',  u:'vlad.kanal', name:'влад',  av:'av31', g:'m', age:23, online:false, st:'гуляю у канала',                    intent:'walk',  ageMin:45,  dist:'500 м', mutual:2, x:118, y:308}
+  ];
+  // интент-статусы, как в дейтингах (Badoo/Tinder «intent badges»)
+  var PRESETS=[
+    {t:'хочу познакомиться',        k:'meet',  em:'👋', lbl:'знакомство'},
+    {t:'скучаю в баре 🍸',          k:'party', em:'🍸', lbl:'бар'},
+    {t:'свободен сегодня вечером',  k:'free',  em:'🌙', lbl:'вечер'},
+    {t:'ищу компанию на прогулку',  k:'walk',  em:'🚶', lbl:'прогулка'},
+    {t:'новенький в городе',        k:'new',   em:'✦', lbl:'знакомство'},
+    {t:'просто пообщаться',         k:'chat',  em:'💬', lbl:'общение'}
+  ];
+  var flt={sex:'any', ageLo:null, ageHi:null, freshLo:0, freshHi:12};
+  var focused=null, my={status:null, intent:null, ttl:null}, evPin=null;
+
+  var world=root.querySelector('#f3world'), scr=root.querySelector('#f3scr'),
+      pinsEl=root.querySelector('#f3pins'), listEl=root.querySelector('#f3list'),
+      panel=root.querySelector('#f3panel'), fcard=root.querySelector('#f3fcard'),
+      countEl=root.querySelector('#f3count'), toast=root.querySelector('#f3toast');
+  var toastT=null;
+  function showToast(t){ toast.textContent=t; toast.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(function(){ toast.classList.remove('show'); },2200); }
+  function ageTxt(m){ if(m==null) return ''; if(m<60) return m+' мин'; return Math.round(m/60)+' ч'; }
+
+  // ---- filters ----
+  function passes(p){
+    if(flt.sex!=='any' && p.g!==flt.sex) return false;
+    if(flt.ageLo!=null && (p.age<flt.ageLo || p.age>flt.ageHi)) return false;
+    if(p.st!=null){ var h=p.ageMin/60; if(h<flt.freshLo || h>flt.freshHi) return false; }
+    return true;
+  }
+  function visible(){ return PEOPLE.filter(passes); }
+
+  // ---- render: map pins ----
+  function renderPins(){
+    pinsEl.innerHTML=visible().map(function(p){
+      // карта статична: только аватарки, весь чат — в боттомщите
+      return '<div class="f3-p'+(p.online?' online':'')+(focused===p.id?' foc':'')+'" data-p="'+p.id+'" style="left:'+p.x+'px; top:'+p.y+'px">'+
+        '<div class="avw"><img class="sq" src="'+A+p.av+'.jpg" alt="'+p.name+'"/></div></div>';
+    }).join('');
+    pinsEl.querySelectorAll('.f3-p').forEach(function(el){
+      el.addEventListener('click', function(e){ e.stopPropagation(); focusOn(el.getAttribute('data-p')); });
+    });
+  }
+
+  // ---- render: list ----
+  // row buttons from around-icons/ContactCard
+  var MSG='<svg viewBox="0 0 48 36" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M18.5 11C17.1193 11 16 12.1193 16 13.5V20C16 21.3807 17.1193 22.5 18.5 22.5H24.5858C24.851 22.5 25.1054 22.6054 25.2929 22.7929L28.1036 25.6036C28.1973 25.6973 28.3245 25.75 28.4571 25.75H28.5C28.7761 25.75 29 25.5261 29 25.25V22.75C29 22.6119 29.1119 22.5 29.25 22.5H29.5C30.8807 22.5 32 21.3807 32 20V13.5C32 12.1193 30.8807 11 29.5 11H18.5ZM19.5 18C20.3284 18 21 17.3284 21 16.5C21 15.6716 20.3284 15 19.5 15C18.6716 15 18 15.6716 18 16.5C18 17.3284 18.6716 18 19.5 18ZM25.5 16.5C25.5 17.3284 24.8284 18 24 18C23.1716 18 22.5 17.3284 22.5 16.5C22.5 15.6716 23.1716 15 24 15C24.8284 15 25.5 15.6716 25.5 16.5ZM28.5 18C29.3284 18 30 17.3284 30 16.5C30 15.6716 29.3284 15 28.5 15C27.6716 15 27 15.6716 27 16.5C27 17.3284 27.6716 18 28.5 18Z" fill="#fff"/></svg>';
+  var SND='<svg viewBox="0 0 48 36" fill="none"><path opacity=".5" d="M32.0578 9.94151C31.8052 9.68891 31.4297 9.60287 31.0928 9.71865L16.2909 14.8432C15.9259 14.9695 15.6768 15.3081 15.6645 15.6958C15.6523 16.0818 15.8803 16.4362 16.2364 16.5853L22.7138 19.2836L25.412 25.7609C25.556 26.1101 25.8963 26.3363 26.2735 26.3346H26.3015C26.6892 26.3241 27.0295 26.0749 27.1559 25.7066L32.2805 10.9062C32.3963 10.5677 32.3102 10.194 32.0576 9.94137L32.0578 9.94151Z" fill="#fff"/></svg>';
+  function rowSub(p){
+    if(p.st) return '<span>'+p.st+' · '+ageTxt(p.ageMin)+'</span>';
+    return '<span class="on">в сети · '+p.dist+'</span>';
+  }
+  function renderList(){
+    var v=visible().slice().sort(function(a,b){ return (b.online-a.online) || ((a.ageMin==null?1e9:a.ageMin)-(b.ageMin==null?1e9:b.ageMin)); });
+    countEl.textContent=v.length;
+    root.querySelector('#f3pplcnt').textContent=v.length+' рядом';
+    root.querySelector('#f3fp').innerHTML=v.slice(0,3).map(function(p){ return '<img src="'+A+p.av+'.jpg">'; }).join('');
+    if(!v.length){ listEl.innerHTML='<div class="f3-empty">по таким фильтрам никого нет</div>'; return; }
+    listEl.innerHTML=v.map(function(p){
+      return '<div class="f3-row'+(p.online?' online':'')+'" data-p="'+p.id+'">'+
+        '<div class="avw"><img class="sqa" src="'+A+p.av+'.jpg" alt=""/></div>'+
+        '<div class="meta"><b>'+p.u+'</b>'+rowSub(p)+'</div>'+
+        '<button class="f3-rb msg" aria-label="написать">'+MSG+'</button>'+
+        '<button class="f3-rb snd" aria-label="отправить привет">'+SND+'</button>'+
+      '</div>';
+    }).join('');
+    listEl.querySelectorAll('.f3-row').forEach(function(row){
+      var id=row.getAttribute('data-p');
+      row.querySelector('.msg').addEventListener('click', function(e){ e.stopPropagation(); });
+      row.querySelector('.snd').addEventListener('click', function(e){ e.stopPropagation(); focusOn(id); });
+      row.addEventListener('click', function(){ focusOn(id); });
+    });
+  }
+  function renderAll(){ renderPins(); renderList(); }
+
+  // ---- focus state: пан карты + карточка ----
+  function panTo(x,y,s){
+    var tx=195-x, ty=290-y;
+    var txMin=(1-s)*(W-x), txMax=(s-1)*x, tyMin=(1-s)*(H-y), tyMax=(s-1)*y;
+    tx=Math.max(txMin, Math.min(txMax, tx)); ty=Math.max(tyMin, Math.min(tyMax, ty));
+    world.classList.add('anim');
+    world.style.transformOrigin=x+'px '+y+'px';
+    world.style.transform='translate('+tx+'px,'+ty+'px) scale('+s+')';
+  }
+  function resetPan(){ world.classList.add('anim'); world.style.transform=''; }
+  function focusOn(id){
+    var p=PEOPLE.find(function(q){return q.id===id;}); if(!p) return;
+    focused=id;
+    scr.classList.add('focus-on');
+    panel.classList.add('hidden');
+    pinsEl.querySelectorAll('.f3-p').forEach(function(el){ el.classList.toggle('foc', el.getAttribute('data-p')===id); });
+    panTo(p.x, p.y, 1.5);
+    // card
+    var st=root.querySelector('#f3fst');
+    if(p.st){ st.textContent=p.st.charAt(0).toUpperCase()+p.st.slice(1); st.classList.remove('none'); }
+    else { st.textContent='в сети · '+p.dist; st.classList.add('none'); }
+    root.querySelector('#f3fav').src=A+p.av+'.jpg';
+    root.querySelector('#f3fname').textContent=p.u;
+    var pool=['av16','av25','av50','av33','av44','av47'];
+    root.querySelector('#f3fpile').innerHTML = p.mutual
+      ? pool.slice(0,Math.min(3,p.mutual)).map(function(a){return '<img src="'+A+a+'.jpg">';}).join('')+(p.mutual>3?'<span class="more">+'+(p.mutual-3)+'</span>':'')
+      : '';
+    root.querySelector('#f3fmuttx').textContent = p.mutual ? p.mutual+' общих друзей' : 'нет общих друзей';
+    root.querySelector('#f3qr').querySelectorAll('.f3-qchip').forEach(function(c){ c.classList.remove('sent'); c.disabled=false; });
+    fcard.classList.add('open');
+  }
+  function unfocus(){
+    if(focused===null) return;
+    focused=null;
+    scr.classList.remove('focus-on');
+    fcard.classList.remove('open');
+    panel.classList.remove('hidden');
+    pinsEl.querySelectorAll('.f3-p.foc').forEach(function(el){ el.classList.remove('foc'); });
+    resetPan();
+  }
+  root.querySelector('#f3fclose').addEventListener('click', unfocus);
+  world.addEventListener('click', function(){ if(focused!==null) unfocus(); });
+  root.querySelector('#f3locate').addEventListener('click', function(){ unfocus(); panel.classList.remove('up'); });
+
+  // ответ в один тап
+  root.querySelector('#f3qr').addEventListener('click', function(e){
+    var c=e.target.closest('.f3-qchip'); if(!c || c.classList.contains('sent')) return;
+    c.classList.add('sent');
+    showToast('отправлено, диалог в чатах');
+  });
+  root.querySelector('#f3fmsg').addEventListener('click', function(){ showToast('диалог открыт в чатах'); });
+
+  // ---- панель: мобильный свайп вверх/вниз ----
+  var stageEl=root.querySelector('.stage');
+  var pdrag=null;
+  function panelScale(){ var r=panel.getBoundingClientRect(); return (r.height/panel.offsetHeight)||1; }
+  function panelBounds(){ return {min:218, max:Math.round(stageEl.offsetHeight*0.66)}; }
+  var pRaf=null, pTargetH=null;
+  function pApply(){ pRaf=null; if(pTargetH!=null && pdrag) panel.style.height=pTargetH+'px'; }
+  function pMove(e){
+    if(!pdrag) return;
+    var dt=e.timeStamp-pdrag.lastT;
+    if(dt>0){ pdrag.v=(e.clientY-pdrag.lastY)/dt; pdrag.lastY=e.clientY; pdrag.lastT=e.timeStamp; }
+    pTargetH=Math.max(pdrag.b.min, Math.min(pdrag.b.max, pdrag.h0+(pdrag.y0-e.clientY)/pdrag.s));
+    if(!pRaf) pRaf=requestAnimationFrame(pApply);
+  }
+  function pEnd(){
+    if(!pdrag) return;
+    var b=panelBounds(), up;
+    if(Math.abs(pdrag.v)>0.35) up=pdrag.v<0;                 // флик — по направлению
+    else up=panel.offsetHeight>(b.min+b.max)/2;              // иначе — к ближайшему стейту
+    pdrag=null;
+    document.removeEventListener('pointermove', pMove);
+    document.removeEventListener('pointerup', pEnd);
+    document.removeEventListener('pointercancel', pEnd);
+    panel.classList.remove('drag');
+    panel.style.height=(up?b.max:b.min)+'px';
+    setTimeout(function(){ panel.classList.toggle('up', up); panel.style.height=''; }, 440);
+  }
+  function pStart(e){
+    if(e.target.closest('button')) return;
+    pdrag={y0:e.clientY, h0:panel.offsetHeight, s:panelScale(), b:panelBounds(), lastY:e.clientY, lastT:e.timeStamp, v:0};
+    panel.classList.add('drag');
+    document.addEventListener('pointermove', pMove);
+    document.addEventListener('pointerup', pEnd);
+    document.addEventListener('pointercancel', pEnd);
+  }
+  root.querySelectorAll('#f3panel .grab, #f3panel .f3-phd').forEach(function(el){
+    el.addEventListener('pointerdown', pStart);
+  });
+
+  // ---- рефреш: и список, и карта ----
+  root.querySelector('#f3refresh').addEventListener('click', function(){
+    var b=this; if(b.classList.contains('spin')) return;
+    b.classList.add('spin');
+    setTimeout(function(){
+      PEOPLE.forEach(function(p){
+        p.x=Math.max(40, Math.min(350, p.x+(Math.sin(p.x*7.13)*38)|0));
+        p.y=Math.max(130, Math.min(590, p.y+(Math.cos(p.y*3.7)*30)|0));
+        if(p.ageMin!=null) p.ageMin=Math.max(1, p.ageMin+((p.ageMin*13)%17)-6);
+      });
+      PEOPLE[5].online=!PEOPLE[5].online; PEOPLE[8].online=!PEOPLE[8].online;
+      renderAll();
+      b.classList.remove('spin');
+      showToast('обновлено ✓');
+    }, 700);
+  });
+
+  // ---- filters sheet ----
+  var fdirty=false;
+  function fltCount(){ return PEOPLE.filter(passes).length; }
+  function syncApply(){ root.querySelector('#f3apply').textContent='показать · '+fltCount(); }
+  root.querySelector('#f3filterbtn').addEventListener('click', function(){ openSheet('f3filters'); });
+  function openSheet(id){
+    var sh=root.querySelector('[data-sheet-id="'+id+'"]'), bd=root.querySelector('.backdrop');
+    sh.classList.add('open'); bd.classList.add('show');
+    if(id==='f3filters') syncApply();
+  }
+  function closeSheets(){
+    root.querySelectorAll('.sheet.open').forEach(function(s){s.classList.remove('open');});
+    root.querySelector('.backdrop').classList.remove('show');
+  }
+  // пол
+  root.querySelector('#f3sexchips').addEventListener('click', function(e){
+    var c=e.target.closest('.chip'); if(!c) return;
+    this.querySelectorAll('.chip').forEach(function(x){x.classList.remove('sel');});
+    c.classList.add('sel'); flt.sex=c.getAttribute('data-sex'); syncApply();
+  });
+  // возраст: диапазоны от возраста юзера
+  var AGE_RANGES=[
+    {lo:null, hi:null, lbl:'любой'},
+    {lo:18, hi:USER_AGE, lbl:'18–'+USER_AGE},
+    {lo:USER_AGE-2, hi:USER_AGE+5, lbl:(USER_AGE-2)+'–'+(USER_AGE+5)},
+    {lo:USER_AGE+3, hi:USER_AGE+12, lbl:(USER_AGE+3)+'–'+(USER_AGE+12)}
+  ];
+  var ageEl=root.querySelector('#f3agechips');
+  ageEl.innerHTML=AGE_RANGES.map(function(r,i){ return '<button class="chip'+(i===0?' sel':'')+'" data-i="'+i+'">'+r.lbl+'</button>'; }).join('');
+  ageEl.addEventListener('click', function(e){
+    var c=e.target.closest('.chip'); if(!c) return;
+    ageEl.querySelectorAll('.chip').forEach(function(x){x.classList.remove('sel');});
+    c.classList.add('sel');
+    var r=AGE_RANGES[parseInt(c.getAttribute('data-i'),10)];
+    flt.ageLo=r.lo; flt.ageHi=r.hi; syncApply();
+  });
+  // давность: двухсторонний фейдер 0–12 ч
+  var RMAX=12, range=root.querySelector('#f3range'), fill=root.querySelector('#f3fill'),
+      thLo=root.querySelector('#f3thlo'), thHi=root.querySelector('#f3thhi'), rv=root.querySelector('#f3rangeval');
+  function rw(){ return range.clientWidth; }
+  function drawRange(){
+    var loP=flt.freshLo/RMAX*100, hiP=flt.freshHi/RMAX*100;
+    thLo.style.left=loP+'%'; thHi.style.left=hiP+'%';
+    fill.style.left=loP+'%'; fill.style.width=(hiP-loP)+'%';
+    rv.textContent=(flt.freshLo===0&&flt.freshHi===RMAX)?'за всё время':
+      (flt.freshLo===0?'свежее '+flt.freshHi+' ч':'от '+flt.freshLo+' ч до '+flt.freshHi+' ч');
+  }
+  function dragThumb(th, isLo){
+    th.addEventListener('pointerdown', function(e){
+      e.preventDefault(); th.setPointerCapture(e.pointerId);
+      var move=function(ev){
+        var r=range.getBoundingClientRect();
+        var v=Math.round((ev.clientX-r.left)/r.width*RMAX);
+        v=Math.max(0, Math.min(RMAX, v));
+        if(isLo) flt.freshLo=Math.min(v, flt.freshHi); else flt.freshHi=Math.max(v, flt.freshLo);
+        drawRange(); syncApply();
+      };
+      var up=function(){ th.removeEventListener('pointermove', move); th.removeEventListener('pointerup', up); };
+      th.addEventListener('pointermove', move); th.addEventListener('pointerup', up);
+    });
+  }
+  dragThumb(thLo, true); dragThumb(thHi, false);
+  drawRange();
+  root.querySelector('#f3apply').addEventListener('click', function(){
+    closeSheets(); renderAll();
+    var def=flt.sex==='any' && flt.ageLo==null && flt.freshLo===0 && flt.freshHi===RMAX;
+    root.querySelector('#f3filterbtn').classList.toggle('on', !def);
+  });
+
+  // ---- мой статус: короткие приглашения + свой вариант ----
+  var selPreset=null, selTtl='2 ч';
+  var preEl=root.querySelector('#f3presets'), custEl=root.querySelector('#f3custom');
+  preEl.innerHTML=PRESETS.map(function(p,i){ return '<button class="chip" data-i="'+i+'">'+p.t+'</button>'; }).join('');
+  function syncSet(){ root.querySelector('#f3setstatus').disabled=!((selPreset||custEl.value.trim())&&selTtl); }
+  preEl.addEventListener('click', function(e){
+    var c=e.target.closest('.chip'); if(!c) return;
+    preEl.querySelectorAll('.chip').forEach(function(x){x.classList.remove('sel');});
+    c.classList.add('sel'); selPreset=PRESETS[parseInt(c.getAttribute('data-i'),10)];
+    custEl.value=''; syncSet();
+  });
+  custEl.addEventListener('input', function(){
+    if(custEl.value.trim()){ preEl.querySelectorAll('.chip').forEach(function(x){x.classList.remove('sel');}); selPreset=null; }
+    syncSet();
+  });
+  root.querySelector('#f3ttls').addEventListener('click', function(e){
+    var c=e.target.closest('.chip'); if(!c) return;
+    root.querySelector('#f3ttls').querySelectorAll('.chip').forEach(function(x){x.classList.remove('sel');});
+    c.classList.add('sel'); selTtl=c.getAttribute('data-ttl'); syncSet();
+  });
+  root.querySelector('#f3editbtn').addEventListener('click', function(e){ e.stopPropagation(); openSheet('f3status'); });
+  root.querySelector('#f3setstatus').addEventListener('click', function(){
+    my.status=selPreset?selPreset.t:custEl.value.trim();
+    my.intent=selPreset?selPreset.k:null; my.ttl=selTtl;
+    my.em=selPreset?selPreset.em:'✦'; my.lbl=selPreset?selPreset.lbl:'встреча';
+    appendChat('<div class="row me"><div class="bubble me">'+my.status.replace(/</g,'&lt;')+'</div></div>');
+    var ttl=root.querySelector('#f3myttl'); ttl.textContent=my.ttl; ttl.style.display='block';
+    closeSheets();
+    showToast('статус висит · '+my.ttl);
+    root.querySelector('#f3shtext').textContent=my.status;
+    setTimeout(function(){ openSheet('f3share'); }, 900);        // приглашение наружу
+    scheduleMatch();                                             // совпадение → мини-событие
+  });
+
+  // ---- share ----
+  root.querySelector('#f3shstory').addEventListener('click', function(){ closeSheets(); showToast('сторис готова ✓'); });
+  root.querySelector('#f3shcopy').addEventListener('click', function(){ closeSheets(); showToast('ссылка скопирована ✓'); });
+
+  // ---- совпадение → мини-событие ----
+  function scheduleMatch(){
+    if(evPin || !my.intent) return;
+    var m=PEOPLE.find(function(p){ return p.intent===my.intent; });
+    if(!m) return;
+    setTimeout(function(){ createEvent(m); }, 3800);
+  }
+  function createEvent(m){
+    if(evPin) return;
+    var you=root.querySelector('#f3you');
+    var yx=parseInt(you.style.left,10), yy=parseInt(you.style.top,10);
+    var ex=(yx+m.x)/2, ey=(yy+m.y)/2;
+    var it={em:my.em||'✦', lbl:my.lbl||'встреча'};
+    evPin=document.createElement('div');
+    evPin.className='f3-p ev'; evPin.style.left=ex+'px'; evPin.style.top=ey+'px';
+    evPin.innerHTML='<div class="bub">'+it.em+' '+it.lbl+' · <b id="f3evn">вас двое</b></div>'+
+      '<div class="duo"><img class="sq" src="'+A+'av12.jpg"><img class="sq" src="'+A+m.av+'.jpg"></div>';
+    world.appendChild(evPin);
+    evPin.addEventListener('click', function(e){ e.stopPropagation(); showToast('чат встречи в сообщениях'); });
+    panTo(ex, ey, 1.35);
+    setTimeout(resetPan, 1600);
+    showToast('встреча создана, '+m.name+' в чате');
+    setTimeout(function(){
+      var g=PEOPLE.find(function(p){return p.online && p.id!==m.id;});
+      if(!g) return;
+      var duo=evPin.querySelector('.duo');
+      var img=document.createElement('img'); img.className='sq'; img.src=A+g.av+'.jpg'; duo.appendChild(img);
+      evPin.querySelector('#f3evn').textContent='3 идут';
+      showToast(g.name+' присоединился, вас трое');
+    }, 6000);
+  }
+
+  // ---- лайв чат района: главный экран щита; люди — вложенный экран ----
+  var viewsEl=root.querySelector('#f3views'), msgsEl=root.querySelector('#f3msgs');
+  function byId(id){ return PEOPLE.find(function(p){return p.id===id;}); }
+  function chatIn(p, text){
+    return '<div class="row in"><img class="av" style="width:26px;height:26px" src="'+A+p.av+'.jpg"><div class="col"><span class="who">'+p.u+'</span><div class="bubble in">'+text+'</div></div></div>';
+  }
+  function appendChat(html){
+    msgsEl.insertAdjacentHTML('beforeend', html);
+    msgsEl.scrollTop=msgsEl.scrollHeight;
+  }
+  root.querySelector('#f3peoplebtn').addEventListener('click', function(){ viewsEl.classList.add('people'); panel.classList.add('up'); });
+  root.querySelector('#f3back').addEventListener('click', function(){ viewsEl.classList.remove('people'); });
+  // история чата
+  msgsEl.innerHTML = chatIn(byId('gosha'),'кто ещё тут?') + chatIn(byId('sonya'),'я у метро, кто рядом?') + chatIn(byId('nastya'),'есть кто свободен вечером?');
+  // новые сообщения приходят сами
+  var ETHER=[
+    'скучно, предлагайте движ', 'го чиллить в парк', 'кто-нибудь в бар сегодня?',
+    'кто ещё тут?', 'есть кто свободен вечером?', 'я у метро, кто рядом?'
+  ];
+  var ei=0;
+  setInterval(function(){
+    var online=visible().filter(function(p){return p.online;});
+    if(!online.length) return;
+    var p=online[ei % online.length]; ei++;
+    appendChat(chatIn(p, ETHER[ei % ETHER.length]));
+  }, 7000);
+  function drop(){
+    var inp=root.querySelector('#f3input'); var v=(inp.value||'').trim(); if(!v) return;
+    appendChat('<div class="row me"><div class="bubble me">'+v.replace(/</g,'&lt;')+'</div></div>');
+    inp.value=''; syncMic();
+    setTimeout(function(){
+      var online=visible().filter(function(p){return p.online;});
+      if(online.length) appendChat(chatIn(online[0], 'я рядом, го!'));
+    }, 2800);
+  }
+  root.querySelector('#f3send').addEventListener('click', drop);
+  root.querySelector('#f3input').addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); drop(); }});
+  // микрофон <-> отправка, как в F1
+  var f3inp=root.querySelector('#f3input'), f3mic=root.querySelector('.f3c-mic');
+  function syncMic(){ f3mic.classList.toggle('sending', f3inp.value.trim().length>0); }
+  f3inp.addEventListener('input', syncMic);
+  f3mic.addEventListener('click', function(){ setTimeout(syncMic, 0); });
+
+  // you pin click -> status sheet
+  root.querySelector('#f3you').addEventListener('click', function(e){ e.stopPropagation(); openSheet('f3status'); });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>

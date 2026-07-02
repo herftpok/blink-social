@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>blink · шар судьбы</title>
+<link rel="stylesheet" href="shared.css?v=4" />
+<style>
+/* ===== F4 — шар судьбы ===== */
+#f4 .f4-scr{background:#0d0b14; overflow:hidden}
+/* градиент из orb/Group (blend поверх тёмного фона) */
+#f4 .f4-grad{position:absolute; left:50%; top:-70px; transform:translateX(-50%); width:648px; max-width:none; pointer-events:none; z-index:0}
+
+#f4 .f4-top{flex:none; display:flex; align-items:center; padding:6px 14px 0; position:relative; z-index:3}
+#f4 .f4-title{flex:1; text-align:center; font-family:var(--font-ui); font-weight:600; font-size:18px; letter-spacing:.2px; text-transform:lowercase; color:#fff; margin-left:46px}
+#f4 .f4-x{width:46px; height:46px; border:none; border-radius:12px; background:rgba(255,255,255,.22); backdrop-filter:blur(10px); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:.12s; padding:0}
+#f4 .f4-x:active{transform:scale(.92)}
+#f4 .f4-x svg{width:20px; height:20px}
+
+/* шар из orb/Frame: парит; текст налезает на нижнюю половину */
+#f4 .f4-orbwrap{position:relative; display:flex; justify-content:center; height:150px; z-index:1; pointer-events:none}
+#f4 .f4-orb{position:relative; width:230px; height:150px; display:flex; justify-content:center}
+#f4 .f4-ball{position:absolute; top:-91px; width:460px; max-width:none; animation:ballfloat 6s ease-in-out infinite; will-change:transform}
+/* нижняя половина сферы растворяется в фоне, как в оригинале */
+#f4 .f4-dim{position:absolute; left:0; right:0; top:195px; height:315px; z-index:1; pointer-events:none; background:linear-gradient(180deg, rgba(13,11,20,0) 0%, rgba(13,11,20,.5) 42%, rgba(13,11,20,.92) 72%, #0d0b14 100%)}
+@keyframes ballfloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+
+#f4 .f4-lead{position:relative; z-index:2; text-align:center; font-family:var(--font-ui); font-weight:700; font-size:20px; line-height:1.35; letter-spacing:-.3px; padding:0 34px; margin-top:2px; text-transform:lowercase; color:#fff; text-shadow:0 2px 14px rgba(13,11,20,.6)}
+#f4 .f4-cdlabel{text-align:center; font-family:var(--font-ui); font-weight:600; font-size:15px; color:#8f8a9c; margin-top:20px; text-transform:lowercase; position:relative; z-index:2}
+#f4 .f4-cd{text-align:center; font-family:var(--font-ui); font-weight:700; font-size:36px; letter-spacing:.5px; font-variant-numeric:tabular-nums; margin-top:0; color:#fff; position:relative; z-index:2}
+
+/* сетка: аватарки 109×109, скругление 44; скроллится только она, края растворяются */
+#f4 .f4-gridwrap{flex:1; min-height:0; position:relative; z-index:2; margin-top:10px; overflow-y:auto;
+  -webkit-mask-image:linear-gradient(180deg, transparent 0, #000 34px, #000 calc(100% - 34px), transparent 100%);
+  mask-image:linear-gradient(180deg, transparent 0, #000 34px, #000 calc(100% - 34px), transparent 100%)}
+#f4 .f4-gridwrap::-webkit-scrollbar{width:0}
+#f4 .f4-grid{display:grid; grid-template-columns:repeat(3,109px); justify-content:center; gap:12px 12px; padding:22px 0 30px}
+#f4 .f4-person{display:flex; flex-direction:column; align-items:center; gap:6px; cursor:pointer; border:none; background:none; padding:0; opacity:0}
+#f4 .f4-person.shown{opacity:1}
+#f4 .f4-person.fly{animation:f4rise 300ms cubic-bezier(.16,1,.3,1) both}
+@keyframes f4rise{from{opacity:0; transform:translateY(18px) scale(.96)}to{opacity:1; transform:none}}
+#f4 .f4-person .avw{position:relative; z-index:1; display:block; width:109px; height:109px; border-radius:44px; perspective:700px; contain:paint; transition:opacity .4s, filter .4s}
+#f4 .f4-flip{position:relative; display:block; width:100%; height:100%; transform-style:preserve-3d; transition:transform 500ms cubic-bezier(.4,0,.2,1)}
+#f4 .f4-person.open .f4-flip{transform:rotateY(180deg)}
+#f4 .f4-person{position:relative}
+#f4 .f4-person::before{content:""; position:absolute; top:-11px; left:50%; transform:translateX(-50%); width:131px; height:131px; border-radius:50%; pointer-events:none; opacity:0; z-index:0;
+  background:radial-gradient(circle, rgba(190,160,255,.75) 0%, rgba(140,160,255,.4) 55%, transparent 72%); filter:blur(14px)}
+#f4 .f4-person.glow::before{animation:cardglow 500ms cubic-bezier(.4,0,.2,1)}
+@keyframes cardglow{0%{opacity:0}45%{opacity:1}100%{opacity:0}}
+#f4 .f4-face{position:absolute; inset:0; border-radius:44px; overflow:hidden; backface-visibility:hidden; -webkit-backface-visibility:hidden; box-shadow:0 6px 18px rgba(0,0,0,.45)}
+#f4 .f4-face.front{background:#23212b; border:1px solid rgba(255,255,255,.09); display:flex; align-items:center; justify-content:center}
+#f4 .f4-face.front img{width:76px; height:auto; display:block}
+#f4 .f4-face.back{transform:rotateY(180deg)}
+#f4 .f4-face.back img{width:100%; height:100%; object-fit:cover; display:block}
+#f4 .f4-person:active .f4-flip{transform:scale(.96)}
+#f4 .f4-person.open:active .f4-flip{transform:rotateY(180deg) scale(.96)}
+#f4 .f4-person .nm{font-family:var(--font-body); font-weight:500; font-size:15px; color:#d6d2e2; opacity:0; transition:opacity .3s .15s}
+#f4 .f4-person.open .nm{opacity:1}
+#f4 .f4-person .bdg{position:absolute; right:2px; bottom:2px; width:26px; height:26px; border-radius:50%; background:var(--green); border:3px solid #0d0b14; display:none; align-items:center; justify-content:center; z-index:2}
+#f4 .f4-person .bdg svg{width:12px; height:12px}
+#f4 .f4-person.sent .avw{box-shadow:0 0 0 3px var(--green)}
+#f4 .f4-person.sent .bdg{display:flex}
+#f4 .f4-person.skip .avw{opacity:.35; filter:saturate(.4)}
+#f4 .f4-person.skip .nm{opacity:.4}
+
+/* нижняя кнопка — тёмная пилюля, как на скриншоте */
+#f4 .f4-foot{flex:none; padding:8px 20px 18px; position:relative; z-index:2; margin-top:auto}
+#f4 .f4-how{width:100%; height:52px; border:none; border-radius:var(--r-cta); background:#26242e; color:#fff; font-family:var(--font-ui); font-weight:700; font-size:15px; letter-spacing:.6px; cursor:pointer; transition:.12s}
+#f4 .f4-how:active{transform:scale(.98)}
+
+/* стейт «на сегодня всё» */
+#f4 .f4-done{position:absolute; left:18px; right:18px; bottom:88px; padding:13px 16px; border-radius:18px; background:rgba(23,19,33,.94); border:1px solid rgba(255,255,255,.12); box-shadow:0 12px 34px rgba(0,0,0,.5); text-align:center; display:none; z-index:6}
+#f4 .f4-done.show{display:block; animation:f4in .4s var(--ease)}
+#f4 .f4-done b{display:block; font-family:var(--font-ui); font-weight:800; font-size:15px; text-transform:lowercase; color:#fff}
+#f4 .f4-done span{display:block; font-family:var(--font-body); font-size:12.5px; color:#8f8a9c; margin-top:3px}
+#f4 .f4-done button{margin-top:9px; height:36px; padding:0 18px; border:none; border-radius:var(--r-pill); background:rgba(255,255,255,.12); color:#fff; font-family:var(--font-ui); font-weight:700; font-size:12.5px; text-transform:lowercase; cursor:pointer}
+@keyframes f4in{from{opacity:0; transform:translateY(8px)}to{opacity:1; transform:none}}
+
+/* ===== карточка человека ===== */
+#f4 .sheet{background:#000}
+/* закрытые шиты уезжают вниз за экран — их тень не должна затемнять кнопку */
+#f4 .sheet:not(.open){box-shadow:none}
+/* блюр бэкдропа в масштабированном контейнере зеркалит фон (баг chromium) — только скрим */
+#f4 .backdrop{backdrop-filter:none; background:rgba(0,0,0,.62)}
+#f4 .f4-pbody{padding:6px 22px 24px; text-align:left; position:relative}
+#f4 .f4-phead{display:flex; align-items:center; gap:13px}
+#f4 .f4-pav{width:64px; height:64px; border-radius:24px; object-fit:cover; flex:none}
+#f4 .f4-pname{font-family:var(--font-ui); font-weight:800; font-size:21px; text-transform:lowercase; color:var(--text)}
+#f4 .f4-pname i{font-style:normal; color:var(--text-muted); font-weight:600}
+#f4 .f4-plbl{font-family:var(--font-body); font-weight:600; font-size:12.5px; color:var(--text-muted); margin:16px 0 8px; text-transform:lowercase}
+#f4 .f4-tags{display:flex; flex-wrap:wrap; gap:8px}
+#f4 .f4-tag{display:flex; align-items:center; gap:7px; height:38px; padding:0 13px; border-radius:12px; background:var(--surface-2); border:1px solid var(--border-subtle); font-family:var(--font-body); font-weight:600; font-size:13.5px; color:var(--text-read)}
+#f4 .f4-tag svg{width:16px; height:16px; flex:none; stroke:var(--text-soft)}
+#f4 .f4-mut{display:flex; align-items:center; gap:10px; margin-top:14px; font-family:var(--font-body); font-size:14px; color:var(--text-muted)}
+#f4 .f4-mut .fp{display:flex}
+#f4 .f4-mut .fp img{width:24px; height:24px; border-radius:50%; border:2px solid #000; margin-left:-8px; object-fit:cover}
+#f4 .f4-mut .fp img:first-child{margin-left:0}
+#f4 .f4-btns{display:flex; gap:10px; margin-top:18px}
+#f4 .f4-padd{flex:1; height:50px; border:none; border-radius:16px; background:#fff; color:#000; font-family:var(--font-ui); font-weight:700; font-size:15px; text-transform:lowercase; cursor:pointer; transition:.12s}
+#f4 .f4-padd:active{transform:scale(.97)}
+#f4 .f4-padd.sent{background:var(--green-tint); color:var(--green)}
+#f4 .f4-pprof{flex:1; height:50px; border:none; border-radius:16px; background:var(--surface-2); color:var(--text); font-family:var(--font-ui); font-weight:700; font-size:15px; text-transform:lowercase; cursor:pointer; transition:.12s}
+#f4 .f4-pprof:active{transform:scale(.97)}
+
+/* ===== как это работает ===== */
+#f4 .f4-howbody{padding:4px 22px 24px; text-align:left; position:relative}
+#f4 .f4-howtitle{font-family:var(--font-ui); font-weight:800; font-size:20px; line-height:1.3; letter-spacing:-.3px; text-transform:lowercase; color:var(--text); padding-top:4px}
+#f4 .f4-howtxt{font-family:var(--font-body); font-size:14.5px; line-height:1.5; color:var(--text-read); margin:12px 0 16px}
+#f4 .f4-howtxt+.f4-howtxt{margin-top:-6px}
+#f4 .f4-ok{width:100%; height:52px; border:none; border-radius:var(--r-cta); background:#fff; color:#000; font-family:var(--font-ui); font-weight:600; font-size:15px; text-transform:lowercase; cursor:pointer; transition:.12s}
+#f4 .f4-ok:active{transform:scale(.98)}
+
+/* toast */
+#f4 .f4-toast{position:absolute; left:50%; top:62px; transform:translate(-50%,-8px); z-index:14; background:var(--surface-3); color:#fff; font-family:var(--font-body); font-weight:600; font-size:12.5px; padding:9px 16px; border-radius:var(--r-pill); box-shadow:0 8px 24px rgba(0,0,0,.45); opacity:0; visibility:hidden; transition:.28s var(--ease); pointer-events:none; max-width:320px; text-align:center}
+#f4 .f4-toast.show{opacity:1; visibility:visible; transform:translate(-50%,0)}
+</style>
+</head>
+<body class="proto-body">
+
+<div id="f4">
+<div class="fproto">
+      <div class="phonewrap"><div class="phone"><div class="stage">
+        <div class="screen active f4-scr" data-screen="f4-orb">
+          <div class="notch"></div>
+          <div class="sb"><span class="sb-time">9:41</span><span class="sb-r"><svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="7.5" width="3" height="4.5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="#fff"><path d="M8.5 2.2c2.5 0 4.8 1 6.4 2.6l-1.5 1.5A7 7 0 0 0 8.5 4.3 7 7 0 0 0 3.6 6.4L2.1 4.8A9 9 0 0 1 8.5 2.2zm0 3.6c1.6 0 3 .6 4 1.7L11 9A4 4 0 0 0 8.5 7.9 4 4 0 0 0 6 9L4.5 7.5a5.6 5.6 0 0 1 4-1.7zm0 3.4 1.7 1.8H6.8z"/></svg><svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x="1" y="1" width="21" height="11" rx="3.2" stroke="#fff" stroke-opacity=".45"/><rect x="2.6" y="2.6" width="16.5" height="7.8" rx="1.8" fill="#fff"/><path d="M23.6 4.7c.9.3.9 3.3 0 3.6z" fill="#fff" fill-opacity=".5"/></svg></span></div>
+
+          <img class="f4-grad" src="../el/orb_grad.png" alt=""/>
+          <div class="f4-top">
+            <div class="f4-title">шар судьбы</div>
+            <button class="f4-x" aria-label="закрыть"><svg viewBox="13 13 20 20" fill="none"><path d="M31.0627 18.4769L27.2446 22.2949L26.5375 23.002L27.2446 23.7091L31.0627 27.5271C31.4532 27.9176 31.4532 28.5508 31.0627 28.9413L28.9413 31.0627C28.5508 31.4532 27.9176 31.4532 27.5271 31.0627L23.7091 27.2446L23.002 26.5375L22.2949 27.2446L18.4769 31.0627C18.0863 31.4532 17.4532 31.4532 17.0627 31.0627L14.9413 28.9413C14.5508 28.5508 14.5508 27.9176 14.9413 27.5271L18.7594 23.7091L19.4665 23.002L18.7593 22.2949L14.9413 18.4769C14.5508 18.0863 14.5508 17.4532 14.9413 17.0627L17.0627 14.9413C17.4532 14.5508 18.0863 14.5508 18.4769 14.9413L22.2949 18.7594L23.002 19.4665L23.7091 18.7593L27.5271 14.9413C27.9176 14.5508 28.5508 14.5508 28.9413 14.9413L31.0627 17.0627C31.4532 17.4532 31.4532 18.0863 31.0627 18.4769Z" fill="#fff"/></svg></button>
+          </div>
+
+          <div class="f4-orbwrap">
+            <div class="f4-orb" id="f4orb"><img class="f4-ball" src="../el/orb_ball.png" alt=""/></div>
+          </div>
+          <div class="f4-dim"></div>
+          <div class="f4-lead" id="f4lead">ежедневно ищем для тебя тех, с&nbsp;кем у тебя много общего</div>
+          <div class="f4-cdlabel">найдём новых людей через</div>
+          <div class="f4-cd" id="f4cd">12:54:36</div>
+
+          <div class="f4-gridwrap" id="f4gridwrap"><div class="f4-grid" id="f4grid"></div></div>
+          <div class="f4-done" id="f4done">
+            <b>на сегодня всё</b>
+            <span id="f4donesub">новая подборка через 12:54</span>
+            <button id="f4invite">позвать друга в blink</button>
+          </div>
+
+          <div class="f4-foot"><button class="f4-how" data-sheet="f4how">КАК ЭТО РАБОТАЕТ</button></div>
+
+          <!-- карточка человека -->
+          <div class="sheet" data-sheet-id="f4person">
+            <div class="grab"></div>
+            <div class="f4-pbody">
+              <div class="f4-phead">
+                <img class="f4-pav" id="f4pav" src="../assets/faces/av25.jpg" alt=""/>
+                <div class="f4-pname"><span id="f4pname">litzy</span> <i id="f4page">· 23</i></div>
+              </div>
+              <div class="f4-plbl">что вас объединяет</div>
+              <div class="f4-tags" id="f4tags"></div>
+              <div class="f4-mut"><span class="fp" id="f4pfp"></span><span id="f4pmut">5 общих друзей</span></div>
+              <div class="f4-btns">
+                <button class="f4-padd" id="f4padd">добавить</button>
+                <button class="f4-pprof" data-sheet="f4prof">профиль</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- как это работает -->
+          <div class="sheet" data-sheet-id="f4how">
+            <div class="grab"></div>
+            <div class="f4-howbody">
+              <div class="f4-howtitle">подборка знакомств по твоим маршрутам и контактам</div>
+              <p class="f4-howtxt">мы посмотрели, где ты был за последние сутки и кто из пользователей был рядом. добавили к этому твои контакты — и вот тебе список людей, с которыми точно стоит познакомиться.</p>
+              <button class="f4-ok" data-sheet-close>окей</button>
+            </div>
+          </div>
+
+          <!-- профиль (реальный элемент Modal _ Profile) -->
+          <div class="sheet" data-sheet-id="f4prof">
+            <div class="grab"></div>
+            <img src="../el/profile.png" alt="профиль" style="width:100%; display:block"/>
+            <div class="hot" data-sheet-close style="left:0; right:0; top:0; height:42px"></div>
+          </div>
+
+          <div class="backdrop"></div>
+          <div class="f4-toast" id="f4toast"></div>
+        </div>
+      </div></div></div>
+    </div>
+</div>
+
+<script src="shared.js?v=4"></script>
+<script>
+(function(){
+  var root=document.getElementById('f4'); if(!root) return;
+  var A='../assets/faces/';
+
+  var PEOPLE=[
+    {id:'настюша', g:'f', av:'av25', age:23, mutual:5, fp:['av16','av47','av31'], tags:[['coffee','кофейни'],['music','вечеринки']]},
+    {id:'лера',    g:'f', av:'av47', age:21, mutual:2, fp:['av25','av5'],          tags:[['park','прогулки в парках'],['coffee','утренний кофе']]},
+    {id:'макс',    g:'m', av:'av33', age:25, mutual:7, fp:['av44','av23','av68'],  tags:[['music','концерты'],['bar','бары']]},
+    {id:'серёга',  g:'m', av:'av53', age:22, mutual:1, fp:['av26'],                tags:[['gym','спортзал'],['park','набережные']]},
+    {id:'тома',    g:'f', av:'av5',  age:26, mutual:4, fp:['av15','av36','av12'], tags:[['coffee','кофейни'],['bar','бары']]},
+    {id:'кирюха',  g:'m', av:'av68', age:24, mutual:3, fp:['av50','av31','av47'], tags:[['music','вечеринки'],['gym','качалка']]},
+    {id:'алёнка',  g:'f', av:'av26', age:22, mutual:2, fp:['av47','av53'],         tags:[['park','парки'],['coffee','кофе с собой']]},
+    {id:'гошан',   g:'m', av:'av15', age:25, mutual:3, fp:['av5','av68','av12'],  tags:[['bar','вечерние бары'],['music','концерты']]},
+    {id:'дашуля',  g:'f', av:'av36', age:24, mutual:1, fp:['av33'],                tags:[['coffee','кофе с собой'],['park','долгие прогулки']]}
+  ];
+  // иконки тегов — Feather/Lucide (open source, MIT)
+  var TICONS={
+    coffee:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><path d="M6 1v3M10 1v3M14 1v3"/></svg>',
+    music:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
+    bar:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 22h8M12 11v11M19 3l-7 8-7-8z"/></svg>',
+    gym:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M3.5 9v6M20.5 9v6M6.5 12h11"/></svg>',
+    park:'<svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 7.5 9.5h2.5L6 15.5h5V21h2v-5.5h5L14 9.5h2.5z"/></svg>'
+  };
+  var state={}; // id -> 'sent' | 'skip' | 'match'
+  var opened={}; // id -> карта перевёрнута
+  var revealed=false, cur=null;
+
+  var grid=root.querySelector('#f4grid'), toast=root.querySelector('#f4toast'), toastT=null;
+  function showToast(t){ toast.textContent=t; toast.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(function(){ toast.classList.remove('show'); },2400); }
+
+  // ---- отсчёт ----
+  var total=12*3600+54*60+36;
+  function fmt(s){ var h=Math.floor(s/3600), m=Math.floor((s%3600)/60), x=s%60; var p=function(n){return (n<10?'0':'')+n;}; return p(h)+':'+p(m)+':'+p(x); }
+  var cd=root.querySelector('#f4cd');
+  setInterval(function(){ total=total>0?total-1:12*3600+54*60+36; cd.textContent=fmt(total);
+    root.querySelector('#f4donesub').textContent='новая подборка через '+fmt(total).slice(0,5); }, 1000);
+
+  // ---- сетка ----
+  function buildGrid(){
+    grid.innerHTML=PEOPLE.map(function(p,i){
+      return '<button class="f4-person'+(revealed?' shown':'')+(opened[p.id]?' open':'')+(state[p.id]==='skip'?' skip':'')+(state[p.id]==='sent'||state[p.id]==='match'?' sent':'')+'" data-i="'+i+'">'+
+        '<span class="avw"><span class="f4-flip">'+
+          '<span class="f4-face front"><img src="../el/star_friends.png" alt=""/></span>'+
+          '<span class="f4-face back"><img src="'+A+p.av+'.jpg" alt=""/></span>'+
+        '</span>'+
+        '<span class="bdg"><svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"/></svg></span></span>'+
+        '<span class="nm">'+p.id+'</span></button>';
+    }).join('');
+    grid.querySelectorAll('.f4-person').forEach(function(el){
+      el.addEventListener('click', function(){
+        if(!revealed) return;
+        var i=parseInt(el.getAttribute('data-i'),10), p=PEOPLE[i];
+        if(!opened[p.id]){ opened[p.id]=true; el.classList.add('open','glow'); return; }
+        openPerson(i);
+      });
+    });
+  }
+
+  // ---- вход: каскадное появление подборки (motion.md, pattern 1) ----
+  function reveal(){
+    if(revealed) return;
+    revealed=true;
+    grid.querySelectorAll('.f4-person').forEach(function(el,i){
+      el.style.animationDelay=(i*70)+'ms';
+      el.classList.add('fly');
+    });
+  }
+  setTimeout(reveal, 350);
+
+  // ---- карточка человека ----
+  var sheet=root.querySelector('[data-sheet-id="f4person"]'), bd=root.querySelector('.backdrop');
+  var padd=root.querySelector('#f4padd');
+  function openPerson(i){
+    var p=PEOPLE[i]; cur=p;
+    root.querySelector('#f4pav').src=A+p.av+'.jpg';
+    root.querySelector('#f4pname').textContent=p.id;
+    root.querySelector('#f4page').textContent='· '+p.age;
+    root.querySelector('#f4tags').innerHTML=p.tags.map(function(t){ return '<span class="f4-tag">'+TICONS[t[0]]+t[1]+'</span>'; }).join('');
+    root.querySelector('#f4pmut').textContent=p.mutual+' '+(p.mutual===1?'общий друг':'общих друзей');
+    root.querySelector('#f4pfp').innerHTML=p.fp.map(function(a){return '<img src="'+A+a+'.jpg">';}).join('');
+    var st=state[p.id];
+    padd.classList.toggle('sent', st==='sent'||st==='match');
+    padd.textContent = st==='match' ? 'вы друзья' : (st==='sent' ? 'заявка отправлена' : 'добавить');
+    sheet.classList.add('open'); bd.classList.add('show');
+  }
+  function closeSheet(){ sheet.classList.remove('open'); bd.classList.remove('show'); }
+  function checkDone(){
+    if(PEOPLE.every(function(p){return state[p.id];})){
+      root.querySelector('#f4done').classList.add('show');
+    }
+  }
+  padd.addEventListener('click', function(){
+    if(!cur || padd.classList.contains('sent')) return;
+    state[cur.id]='sent';
+    padd.classList.add('sent'); padd.textContent='заявка отправлена';
+    buildGrid(); checkDone();
+    var p=cur;
+    setTimeout(closeSheet, 550);
+    if(!root.__matched){ root.__matched=true;
+      setTimeout(function(){
+        state[p.id]='match'; buildGrid();
+        showToast(p.id+' тоже '+(p.g==='f'?'добавила':'добавил')+' тебя — вы друзья');
+      }, 2600);
+    }
+  });
+  root.querySelector('#f4invite').addEventListener('click', function(){ showToast('ссылка скопирована ✓'); });
+
+  buildGrid();
+})();
+</script>
+</body>
+</html>

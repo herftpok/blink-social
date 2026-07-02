@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>blink · чаты событий</title>
+<link rel="stylesheet" href="shared.css?v=3" />
+<style>
+#f1 .f1-ev{display:flex; flex-direction:column; align-items:center}
+#f1 .f1-evring{width:64px; height:64px; border-radius:50%; display:flex; align-items:center; justify-content:center; background:radial-gradient(circle, rgba(255,120,200,.5), rgba(140,120,255,.18) 60%, transparent 74%); animation:evpulse 2s ease-in-out infinite}
+#f1 .f1-evring img{width:50px; height:50px; filter:drop-shadow(0 4px 12px rgba(0,0,0,.5))}
+#f1 .f1-evcnt{margin-top:-2px; background:#fff; color:#000; font-family:var(--font-body); font-weight:800; font-size:12px; padding:3px 10px; border-radius:var(--r-pill); box-shadow:0 4px 12px rgba(0,0,0,.3); white-space:nowrap}
+/* friend map pins — finished Pin 1 / Pin 2 graphics (photo + house + time baked in) */
+#f1 .f1-imgpin{position:absolute; transform:translate(-50%,-100%); width:112px; height:auto; z-index:4; filter:drop-shadow(0 8px 16px rgba(0,0,0,.45))}
+/* invite — matches «Вступление в чат.png» */
+#f1 .f1-invite{flex:1; display:flex; flex-direction:column; align-items:center; padding:0 26px; text-align:center}
+#f1 .f1-invite .top{flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:0}
+#f1 .f1-evbadge{width:84px; height:84px; border-radius:24px; background:var(--surface-3); display:flex; align-items:center; justify-content:center}
+#f1 .f1-evbadge img{width:52px; height:52px}
+#f1 .f1-evtitle{font-size:30px; font-weight:800; letter-spacing:-.6px; text-transform:lowercase; margin:26px 0 6px}
+#f1 .f1-evcount{font-size:14px; color:var(--text-muted); font-family:var(--font-body); margin-bottom:24px}
+#f1 .f1-cluster{display:flex; justify-content:center; align-items:center; margin-bottom:18px}
+#f1 .f1-cluster img{width:54px; height:54px; border-radius:15px; object-fit:cover; margin-left:-10px; box-shadow:0 4px 14px rgba(0,0,0,.45)}
+#f1 .f1-cluster img:nth-child(1){margin-left:0; transform:rotate(-6deg)}
+#f1 .f1-cluster img:nth-child(2){transform:rotate(3deg)}
+#f1 .f1-cluster img:nth-child(3){transform:rotate(-3deg)}
+#f1 .f1-cluster img:nth-child(4){transform:rotate(6deg)}
+#f1 .f1-already{font-size:13.5px; color:var(--text-muted); font-family:var(--font-body); max-width:280px}
+#f1 .f1-already b{color:#fff; font-weight:700}
+#f1 .f1-actions{width:100%; display:flex; flex-direction:column; align-items:center; gap:4px; padding-bottom:26px}
+/* chat header — SquareButton.svg / SquareButton-1.svg (black squircle, #242424 border) */
+#f1 .f1-chat .ah{padding:8px 16px 14px}
+#f1 .f1-chbtn{width:46px; height:46px; border-radius:11px; border:2px solid #242424; background:#000; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:.12s}
+#f1 .f1-chbtn:hover{background:#141414} #f1 .f1-chbtn:active{transform:scale(.94)}
+#f1 .f1-chbtn svg{width:20px; height:20px}
+#f1 .f1-chttl{flex:1; min-width:0; display:flex; align-items:center; justify-content:center; gap:11px; cursor:pointer}
+#f1 .f1-chttl img{width:46px; height:46px; border-radius:50%; object-fit:cover; flex:none}
+#f1 .f1-chttl .nm{min-width:0; text-align:left}
+#f1 .f1-chttl .nm b{display:block; font-weight:800; font-size:20px; text-transform:lowercase; line-height:1.1; letter-spacing:-.4px; white-space:nowrap}
+#f1 .f1-chttl .nm span{font-size:13px; color:var(--text-muted); font-family:var(--font-body)}
+/* outgoing bubbles are WHITE (per «текст.png»); incoming are gray #242424 */
+#f1 .f1-chat .bubble{border-radius:21px}
+#f1 .f1-chat .bubble.me{background:#fff; color:#0a0a0a}
+#f1 .f1-chat .row.me .bubble.photo{background:#fff}
+#f1 .f1-chat .bubble.in{background:#242424; color:#fff}
+#f1 .f1-chat .typing i{background:rgba(255,255,255,.45)}
+#f1 .f1-chat .who{color:#fff}
+/* chat info / participants */
+#f1 .f1-ihead{display:flex; flex-direction:column; align-items:center; padding:10px 16px 16px}
+#f1 .f1-gavatar{width:88px; height:88px; border-radius:26px; overflow:hidden; box-shadow:0 8px 24px rgba(0,0,0,.45)}
+#f1 .f1-gavatar img{width:100%; height:100%; object-fit:cover}
+#f1 .f1-gtitle{font-weight:800; font-size:24px; letter-spacing:-.4px; text-transform:lowercase; margin:14px 0 16px}
+#f1 .f1-gbtns{display:flex; gap:14px}
+#f1 .f1-gbtn{width:50px; height:50px; border-radius:50%; border:none; background:var(--surface-2); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; transition:.12s}
+#f1 .f1-gbtn:active{transform:scale(.94)} #f1 .f1-gbtn svg{width:21px; height:21px}
+#f1 .f1-seclabel{display:flex; align-items:center; gap:8px; padding:6px 18px 6px; font-size:13.5px; color:var(--text-muted); text-transform:lowercase}
+#f1 .f1-seclabel span{background:var(--surface-3); color:var(--text-soft); font-family:var(--font-body); font-weight:700; font-size:11px; padding:2px 8px; border-radius:var(--r-pill)}
+#f1 .f1-prow{display:flex; align-items:center; gap:13px; padding:8px 16px}
+#f1 .f1-prow:active{background:rgba(255,255,255,.03)}
+#f1 .f1-addrow{cursor:pointer}
+#f1 .f1-addic{width:46px; height:46px; border-radius:14px; background:var(--surface-2); display:flex; align-items:center; justify-content:center; flex:none}
+#f1 .f1-addic svg{width:22px; height:22px}
+#f1 .f1-addrow>span{color:var(--text-soft); font-size:15px}
+#f1 .f1-pmeta{flex:1; min-width:0; line-height:1.22}
+#f1 .f1-pmeta>b{display:block; font-size:16px; font-weight:700; text-transform:lowercase}
+#f1 .f1-pmeta>span{font-size:13px; color:var(--text-muted); font-family:var(--font-body)}
+#f1 .f1-mut{display:flex !important; align-items:center; gap:7px}
+#f1 .f1-mut .facepile{display:flex}
+#f1 .f1-mut .facepile img{width:20px; height:20px; border-radius:50%; border:2px solid #000; margin-left:-7px; object-fit:cover}
+#f1 .f1-mut .facepile img:first-child{margin-left:0}
+#f1 .f1-locbtn{width:54px; height:38px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none}
+#f1 .f1-locbtn svg{width:20px; height:20px}
+#f1 .f1-addbtn{width:54px; height:42px; border-radius:14px; border:none; background:linear-gradient(135deg,#7fd2ff,#a98bff); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:.12s}
+#f1 .f1-addbtn:active{transform:scale(.94)} #f1 .f1-addbtn svg{width:21px; height:21px}
+#f1 .f1-addbtn.sent{background:var(--surface-3)}
+/* composer — elements from input_chat/ (Button_M*, Input_message.svg), per Bottom_bar_messenger.png */
+#f1 .f1-loc{flex:none; text-align:center; font-family:var(--font-body); font-size:13.5px; color:var(--text-soft); padding:5px 0 9px; display:flex; align-items:center; justify-content:center; gap:4px}
+#f1 .f1-loc svg{width:13px; height:13px; flex:none}
+#f1 .f1-comp{flex:none; display:flex; align-items:center; gap:9px; padding:0 12px 14px}
+#f1 .f1-aa{width:44px; height:44px; border-radius:14px; border:2px solid rgba(255,255,255,.15); background:rgba(255,255,255,.25); color:#fff; cursor:pointer; flex:none; display:flex; align-items:center; justify-content:center}
+#f1 .f1-aa svg{width:26px; height:26px}
+#f1 .f1-input{flex:1; min-width:0; height:44px; border-radius:14px; background:rgba(255,255,255,.25); display:flex; align-items:center; padding:0 6px 0 14px; gap:6px; border:2px solid rgba(255,255,255,.15); transition:border-color .15s var(--ease), box-shadow .15s var(--ease)}
+#f1 .f1-input:focus-within{border-color:rgba(255,255,255,.38)}
+#f1 .f1-input input{flex:1; min-width:0; background:none; border:none; outline:none; color:#fff; font-family:var(--font-body); font-size:16px}
+#f1 .f1-input input::placeholder{color:var(--text-placeholder)}
+#f1 .f1-stk{width:32px; height:32px; border:none; background:none; color:rgba(255,255,255,.3); display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none}
+#f1 .f1-stk svg{width:24px; height:24px}
+#f1 .f1-sq{width:44px; height:44px; border-radius:14px; border:2px solid rgba(255,255,255,.15); background:rgba(255,255,255,.25); color:#fff; display:flex; align-items:center; justify-content:center; cursor:pointer; flex:none; transition:.12s}
+#f1 .f1-sq svg{width:24px; height:24px}
+#f1 .f1-sq:active{transform:scale(.94)}
+#f1 .f1-mic.sending{background:#fff}
+#f1 .f1-mic.sending .ic-mic{display:none}
+#f1 .f1-mic.sending .ic-send{display:block !important}
+</style>
+</head>
+<body class="proto-body">
+
+<div id="f1">
+<div class="fproto">
+      <div class="phonewrap"><div class="phone"><div class="stage">
+
+        <!-- MAP -->
+        <div class="screen active" data-screen="f1-map">
+          <div class="notch"></div>
+          <div class="sb onmap"><span class="sb-time" style="color:#111">9:41</span><span class="sb-r" data-dark><svg width="18" height="12" viewBox="0 0 18 12" fill="#111"><rect x="0" y="7.5" width="3" height="4.5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="#111"><path d="M8.5 2.2c2.5 0 4.8 1 6.4 2.6l-1.5 1.5A7 7 0 0 0 8.5 4.3 7 7 0 0 0 3.6 6.4L2.1 4.8A9 9 0 0 1 8.5 2.2zm0 3.6c1.6 0 3 .6 4 1.7L11 9A4 4 0 0 0 8.5 7.9 4 4 0 0 0 6 9L4.5 7.5a5.6 5.6 0 0 1 4-1.7zm0 3.4 1.7 1.8H6.8z"/></svg><svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x="1" y="1" width="21" height="11" rx="3.2" stroke="#111" stroke-opacity=".45"/><rect x="2.6" y="2.6" width="16.5" height="7.8" rx="1.8" fill="#111"/><path d="M23.6 4.7c.9.3.9 3.3 0 3.6z" fill="#111" fill-opacity=".5"/></svg></span></div>
+          <div class="map" style="flex:1">
+            <img class="shot" src="../el/map.png" alt=""/>
+            <img class="el" src="../el/maptop.png" alt="" style="left:0; top:36px; width:390px"/>
+
+            <!-- friends nearby — finished pin graphics (Pin 1 / Pin 2) -->
+            <img class="f1-imgpin" src="../el/pin1.png" alt="" style="left:272px; top:300px"/>
+            <img class="f1-imgpin" src="../el/pin2.png" alt="" style="left:86px; top:586px"/>
+            <!-- наш пользователь — own pin -->
+            <div class="pin" style="left:150px; top:500px; z-index:5"><div class="pin2"><img class="bg" src="../el/pinbg.svg"><img class="ph" src="../assets/faces/av13.jpg"></div></div>
+
+            <!-- EVENT entry (disco icon) right next to your pin -->
+            <div class="el tap f1-ev" id="f1enter" data-f1enter style="left:200px; top:402px">
+              <div class="f1-evring"><img src="../icon.png" alt="клуб космонавт"/></div>
+            </div>
+
+            <!-- iOS push -->
+            <div class="push" id="f1push" data-f1enter>
+              <img class="appicon" src="../blink-logo.webp" alt=""/>
+              <div class="pb">
+                <div class="pt"><div class="ptop"><b>клуб космонавт</b><span class="tm">сейчас</span></div><span>рядом больше 100 блинчиков, открылся общий чат 🔥</span></div>
+              </div>
+            </div>
+
+            <img class="el" src="../el/tools.png" alt="" style="left:0; bottom:140px; width:390px"/>
+            <img class="el" src="../el/tabbar.png" alt="" style="left:0; bottom:4px; width:390px"/>
+          </div>
+        </div>
+
+        <!-- INVITE (redrawn with prototype data, styled per «Вступление в чат») -->
+        <div class="screen" data-screen="f1-invite">
+          <div class="notch"></div>
+          <div class="sb"><span class="sb-time">9:41</span><span class="sb-r"><svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="7.5" width="3" height="4.5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="#fff"><path d="M8.5 2.2c2.5 0 4.8 1 6.4 2.6l-1.5 1.5A7 7 0 0 0 8.5 4.3 7 7 0 0 0 3.6 6.4L2.1 4.8A9 9 0 0 1 8.5 2.2zm0 3.6c1.6 0 3 .6 4 1.7L11 9A4 4 0 0 0 8.5 7.9 4 4 0 0 0 6 9L4.5 7.5a5.6 5.6 0 0 1 4-1.7zm0 3.4 1.7 1.8H6.8z"/></svg><svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x="1" y="1" width="21" height="11" rx="3.2" stroke="#fff" stroke-opacity=".45"/><rect x="2.6" y="2.6" width="16.5" height="7.8" rx="1.8" fill="#fff"/><path d="M23.6 4.7c.9.3.9 3.3 0 3.6z" fill="#fff" fill-opacity=".5"/></svg></span></div>
+          <div class="f1-invite">
+            <div class="top">
+              <div class="f1-evbadge"><img src="../icon.png" alt=""/></div>
+              <h3 class="f1-evtitle">клуб космонавт</h3>
+              <div class="f1-evcount">47 человек</div>
+              <div class="f1-cluster">
+                <img src="../assets/faces/av47.jpg" alt=""/><img src="../assets/faces/av31.jpg" alt=""/><img src="../assets/faces/av5.jpg" alt=""/><img src="../assets/faces/av68.jpg" alt=""/>
+              </div>
+              <div class="f1-already">в чатике уже есть <b>лена, тюбик, марк, пётр</b></div>
+            </div>
+            <div class="f1-actions">
+              <button class="cta" data-goto="f1-chat" id="f1join">вступить в чатик</button>
+              <button class="textbtn" data-goto="f1-map">отмена</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- CHAT -->
+        <div class="screen f1-chat" data-screen="f1-chat">
+          <div class="notch"></div>
+          <div class="sb"><span class="sb-time">9:41</span><span class="sb-r"><svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="7.5" width="3" height="4.5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="#fff"><path d="M8.5 2.2c2.5 0 4.8 1 6.4 2.6l-1.5 1.5A7 7 0 0 0 8.5 4.3 7 7 0 0 0 3.6 6.4L2.1 4.8A9 9 0 0 1 8.5 2.2zm0 3.6c1.6 0 3 .6 4 1.7L11 9A4 4 0 0 0 8.5 7.9 4 4 0 0 0 6 9L4.5 7.5a5.6 5.6 0 0 1 4-1.7zm0 3.4 1.7 1.8H6.8z"/></svg><svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x="1" y="1" width="21" height="11" rx="3.2" stroke="#fff" stroke-opacity=".45"/><rect x="2.6" y="2.6" width="16.5" height="7.8" rx="1.8" fill="#fff"/><path d="M23.6 4.7c.9.3.9 3.3 0 3.6z" fill="#fff" fill-opacity=".5"/></svg></span></div>
+          <div class="ah line">
+            <button class="f1-chbtn" data-goto="f1-map" aria-label="назад"><svg viewBox="13 13 20 20" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M20.1232 21.3319L31.4792 21.3319C31.9394 21.3319 32.3125 21.705 32.3125 22.1653L32.3125 23.8319C32.3125 24.2922 31.9394 24.6653 31.4792 24.6653L20.1232 24.6653L23.6046 28.1021C23.9322 28.4254 23.9356 28.953 23.6122 29.2805L22.4413 30.4666C22.118 30.7942 21.5904 30.7976 21.2629 30.4742L14.5912 23.8882C14.0955 23.3987 14.0955 22.5985 14.5912 22.109L21.2629 15.5229C21.5904 15.1996 22.118 15.203 22.4413 15.5305L23.6122 16.7166C23.9356 17.0442 23.9322 17.5718 23.6046 17.8951L20.1232 21.3319Z" fill="#fff"/></svg></button>
+            <div class="f1-chttl" data-goto="f1-info">
+              <img src="../assets/venues/club2.jpg" alt=""/>
+              <div class="nm"><b>клуб космонавт</b><span>47 человек · идёт сейчас</span></div>
+            </div>
+            <button class="f1-chbtn" data-goto="f1-info" aria-label="позвонить"><svg viewBox="13 13 20 20" fill="none"><path fill-rule="evenodd" clip-rule="evenodd" d="M27.7429 25.3302C28.7645 25.8979 29.7867 26.4657 30.8082 27.0334C31.2479 27.2776 31.4408 27.7956 31.2677 28.2681C30.3887 30.6692 27.8146 31.9367 25.3925 31.0527C20.4328 29.2424 16.7565 25.5659 14.946 20.6062C14.062 18.1842 15.3295 15.61 17.7306 14.7311C18.2031 14.5579 18.7212 14.7508 18.9659 15.1905C19.533 16.2121 20.1008 17.2343 20.6685 18.2558C20.9347 18.735 20.8721 19.3039 20.5079 19.7131C20.0309 20.2499 19.5539 20.7866 19.0769 21.3228C20.0951 23.8023 22.1964 25.9036 24.6759 26.9218C25.2121 26.4447 25.7488 25.9678 26.2855 25.4908C26.6954 25.1266 27.2638 25.064 27.7429 25.3301L27.7429 25.3302Z" fill="#fff"/></svg></button>
+          </div>
+          <div class="msgs" id="f1msgs">
+            <div class="daysep">сегодня</div>
+            <div class="row in"><img class="av" style="width:28px;height:28px" src="../assets/faces/av47.jpg" alt=""/><div class="col"><span class="who">лена</span><div class="bubble in">вы где? мы у бара слева</div></div></div>
+            <div class="row in"><img class="av" style="width:28px;height:28px" src="../assets/faces/av31.jpg" alt=""/><div class="col"><span class="who">тюбик</span><div class="bubble in photo"><img src="../assets/venues/club2.jpg" alt=""/><div class="cap">тут жара 🔥</div></div></div></div>
+            <div class="row me"><div class="bubble me">идём, заняли столик у сцены</div></div>
+            <div class="row in"><img class="av" style="width:28px;height:28px" src="../assets/faces/av5.jpg" alt=""/><div class="col"><span class="who">марк</span><div class="bubble in">диджей сегодня просто топ 🎧</div></div></div>
+            <div class="row in"><img class="av" style="width:28px;height:28px" src="../assets/faces/av68.jpg" alt=""/><div class="col"><span class="who">пётр</span><div class="bubble in big">это лучший сет 🔊</div></div></div>
+          </div>
+          <div class="f1-loc"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 21s-7-7.6-7-12a7 7 0 0 1 14 0c0 4.4-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/></svg>космонавт &nbsp;›</div>
+          <div class="f1-comp composer">
+            <button class="f1-aa" aria-label="формат"><svg viewBox="8 8 28 28" fill="none"><path d="M11.5625 29.291C10.2441 29.291 9.45312 28.5391 9.45312 27.2891C9.45312 26.9277 9.56055 26.4004 9.74609 25.9023L12.9004 17.1914C13.5059 15.4824 14.5312 14.7109 16.1816 14.7109C17.9492 14.7109 18.9648 15.4531 19.5996 17.1914L22.7832 25.9023C22.9785 26.4395 23.0566 26.8301 23.0566 27.2793C23.0566 28.4512 22.1875 29.291 20.9863 29.291C19.7656 29.291 19.1309 28.7344 18.7793 27.3672L18.5352 26.4102H13.9453L13.7012 27.2988C13.3105 28.7148 12.6855 29.291 11.5625 29.291ZM14.7266 23.3242H17.666L16.2012 18.207H16.123L14.7266 23.3242Z" fill="#fff"/><path d="M27.4414 29.2031C25.4785 29.2031 23.8086 27.8555 23.8086 25.9121C23.8086 23.8418 25.4004 22.7188 28.2812 22.543L30.6445 22.3965V21.8691C30.6445 21.1465 30.0977 20.7559 29.3457 20.7559C28.7207 20.7559 28.4082 20.9219 27.7148 21.5566C27.2461 21.9863 26.7383 22.2012 26.1426 22.2012C25.1953 22.2012 24.5215 21.6152 24.5215 20.7852C24.5215 20.541 24.541 20.3848 24.5996 20.1895C25.0098 18.8125 26.875 17.9922 29.5605 17.9922C32.5488 17.9922 34.5508 19.4863 34.5508 21.6738V27.2793C34.5508 28.666 33.7207 29.291 32.5684 29.291C31.5137 29.291 30.7715 28.7734 30.6445 27.6016H30.5664C30 28.6562 28.6914 29.2031 27.4414 29.2031ZM28.9355 26.5273C29.8242 26.5273 30.6445 26.0293 30.6445 25.2383V24.5352L28.9453 24.6523C28.1836 24.7109 27.7539 25.0723 27.7539 25.5996C27.7539 26.1855 28.2324 26.5273 28.9355 26.5273Z" fill="#fff"/></svg></button>
+            <div class="f1-input"><input type="text" placeholder="написать…" data-input/>
+              <button class="f1-stk" aria-label="стикеры"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5s1.3 1.6 3.5 1.6 3.5-1.6 3.5-1.6" stroke-linecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/></svg></button>
+            </div>
+            <button class="f1-sq" aria-label="фото"><svg viewBox="8 8 28 28" fill="none"><circle cx="17.5" cy="18" r="2" fill="#fff"/><path d="M21.6903 22.0796L15 31H30L32.5 29.5L26.4221 21.992C25.1927 20.4733 22.8627 20.5164 21.6903 22.0796Z" fill="#fff" clip-path="url(#f1phclip)"/><rect x="12" y="12" width="20" height="20" rx="5" stroke="#fff" stroke-width="2"/><defs><clipPath id="f1phclip"><rect x="13" y="13" width="18" height="18" rx="4"/></clipPath></defs></svg></button>
+            <button class="f1-sq f1-mic" data-send aria-label="отправить"><svg class="ic-mic" viewBox="8 8 28 28" fill="none"><path d="M30 23.125C30 26.975 25.85 30.125 22 30.125M22 30.125C18.15 30.125 14 26.975 14 23.125M22 30.125V34.0002" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 21.9375V15C18 13.3431 19.3431 12 21 12H22.9999C24.6568 12 25.9999 13.3431 25.9999 15V21.9375C25.9999 24.1875 24.1875 26 22 26C19.8125 26 18 24.1375 18 21.9375Z" fill="#fff" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg><svg class="ic-send" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M12 19V5M6 11l6-6 6 6"/></svg></button>
+          </div>
+        </div>
+
+        <!-- CHAT INFO / participants (tap the chat header) -->
+        <div class="screen" data-screen="f1-info">
+          <div class="notch"></div>
+          <div class="sb"><span class="sb-time">9:41</span><span class="sb-r"><svg width="18" height="12" viewBox="0 0 18 12" fill="#fff"><rect x="0" y="7.5" width="3" height="4.5" rx="1"/><rect x="5" y="5" width="3" height="7" rx="1"/><rect x="10" y="2.5" width="3" height="9.5" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg><svg width="17" height="12" viewBox="0 0 17 12" fill="#fff"><path d="M8.5 2.2c2.5 0 4.8 1 6.4 2.6l-1.5 1.5A7 7 0 0 0 8.5 4.3 7 7 0 0 0 3.6 6.4L2.1 4.8A9 9 0 0 1 8.5 2.2zm0 3.6c1.6 0 3 .6 4 1.7L11 9A4 4 0 0 0 8.5 7.9 4 4 0 0 0 6 9L4.5 7.5a5.6 5.6 0 0 1 4-1.7zm0 3.4 1.7 1.8H6.8z"/></svg><svg width="26" height="13" viewBox="0 0 26 13" fill="none"><rect x="1" y="1" width="21" height="11" rx="3.2" stroke="#fff" stroke-opacity=".45"/><rect x="2.6" y="2.6" width="16.5" height="7.8" rx="1.8" fill="#fff"/><path d="M23.6 4.7c.9.3.9 3.3 0 3.6z" fill="#fff" fill-opacity=".5"/></svg></span></div>
+          <div class="ah">
+            <button class="ico" data-goto="f1-chat" aria-label="назад"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <div style="flex:1"></div>
+            <button class="ico" aria-label="изменить"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17v3z"/></svg></button>
+          </div>
+          <div class="scroll">
+            <div class="f1-ihead">
+              <div class="f1-gavatar"><img src="../assets/venues/club2.jpg" alt=""/></div>
+              <div class="f1-gtitle">клуб космонавт</div>
+              <div class="f1-gbtns">
+                <button class="f1-gbtn" aria-label="позвонить"><svg viewBox="0 0 24 24" fill="#fff"><path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.4.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.8 21 3 13.2 3 3.4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.4 0 .8-.3 1.1z"/></svg></button>
+                <button class="f1-gbtn" aria-label="уведомления"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 0 1 12 0c0 4.5 1.8 5.6 1.8 5.6H4.2S6 13.5 6 9z"/><path d="M10 19a2 2 0 0 0 4 0"/></svg></button>
+                <button class="f1-gbtn" aria-label="ещё"><svg viewBox="0 0 24 24" fill="#fff"><circle cx="5.5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="18.5" cy="12" r="1.8"/></svg></button>
+              </div>
+            </div>
+            <div class="f1-seclabel">участники <span>47</span></div>
+            <div class="f1-prow f1-addrow">
+              <div class="f1-addic"><svg viewBox="0 0 24 24" fill="none" stroke="var(--text-soft)" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.6 19c.6-3.2 3-5 5.4-5 .9 0 1.8.2 2.5.6"/><path d="M17 11.5v5M14.5 14h5"/></svg></div>
+              <span>добавить участника</span>
+            </div>
+            <div class="f1-prow"><img class="av sq" style="width:46px;height:46px" src="../assets/faces/av16.jpg"><div class="f1-pmeta"><b>sanek</b><span>создал чатик</span></div></div>
+            <div class="f1-prow"><img class="av sq" style="width:46px;height:46px" src="../assets/faces/av25.jpg"><div class="f1-pmeta"><b>юльчик</b><span>10 м</span></div><button class="f1-locbtn" aria-label="на карте"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg></button></div>
+            <div class="f1-prow"><img class="av sq" style="width:46px;height:46px" src="../assets/faces/av44.jpg"><div class="f1-pmeta"><b>артём</b><span>12 км</span></div><button class="f1-locbtn" aria-label="на карте"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg></button></div>
+            <div class="f1-prow"><img class="av sq" style="width:46px;height:46px" src="../assets/faces/av50.jpg"><div class="f1-pmeta"><b>ирэн</b><span class="f1-mut"><span class="facepile"><img src="../assets/faces/av23.jpg"><img src="../assets/faces/av5.jpg"><img src="../assets/faces/av31.jpg"></span>+2 · 5 общих</span></div><button class="f1-addbtn" data-add aria-label="добавить"><svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.6 19c.6-3.2 3-5 5.4-5 .9 0 1.8.2 2.5.6"/><path d="M17 11.5v5M14.5 14h5"/></svg></button></div>
+            <div class="f1-prow"><img class="av sq" style="width:46px;height:46px" src="../assets/faces/av5.jpg"><div class="f1-pmeta"><b>bezai</b><span class="f1-mut"><span class="facepile"><img src="../assets/faces/av47.jpg"><img src="../assets/faces/av44.jpg"><img src="../assets/faces/av68.jpg"></span>+3 · 6 общих</span></div><button class="f1-addbtn" data-add aria-label="добавить"><svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.6 19c.6-3.2 3-5 5.4-5 .9 0 1.8.2 2.5.6"/><path d="M17 11.5v5M14.5 14h5"/></svg></button></div>
+          </div>
+        </div>
+
+      </div></div></div>
+    </div>
+</div>
+
+<script src="shared.js?v=2"></script>
+<script>
+/* ===== F1: live chat feed ===== */
+(function(){
+  var root=document.getElementById('f1'); if(!root) return;
+  var msgs=root.querySelector('#f1msgs');
+  var feed=[
+    {s:'in', who:'соня', c:'#c18cff', av:'av33', t:'мы подходим, нас четверо 👋'},
+    {s:'in', who:'лена', c:'#5ff780', av:'av47', t:'у бара очередь, берите сразу по две'},
+    {s:'in', who:'марк', c:'#6ab2ff', av:'av5', t:'после космонавта идём на крышу, кто с нами?'},
+    {s:'in', who:'тюбик', c:'#ff75e1', av:'av31', t:'я в деле 🙌'},
+    {s:'in', who:'кира', c:'#ffb269', av:'av23', t:'нашла столик у колонок, го к нам'}
+  ];
+  var i=0, started=false, timer=null;
+  function appendTyping(f){
+    var row=document.createElement('div'); row.className='row in'; row.dataset.tmp='1';
+    row.innerHTML='<img class="av" style="width:28px;height:28px" src="../assets/faces/'+f.av+'.jpg"><div class="col"><div class="bubble in" style="padding:0"><div class="typing"><i></i><i></i><i></i></div></div></div>';
+    msgs.appendChild(row); msgs.scrollTop=msgs.scrollHeight; return row;
+  }
+  function bubbleHtml(f){
+    if(f.s==='me'){
+      if(f.photo) return '<div class="row me msg-enter"><div class="bubble me photo"><img src="'+f.photo+'"></div></div>';
+      return '<div class="row me msg-enter"><div class="bubble me">'+f.t+'</div></div>';
+    }
+    var inner = f.photo ? '<div class="bubble in photo"><img src="'+f.photo+'"></div>' : '<div class="bubble in">'+f.t+'</div>';
+    return '<div class="row in msg-enter"><img class="av" style="width:28px;height:28px" src="../assets/faces/'+f.av+'.jpg"><div class="col"><span class="who">'+f.who+'</span>'+inner+'</div></div>';
+  }
+  function step(){
+    if(i>=feed.length){ return; }            // one batch only — no loop, no duplicates
+    var f=feed[i++];
+    var tr=appendTyping(f);
+    timer=setTimeout(function(){
+      tr.remove();
+      msgs.insertAdjacentHTML('beforeend', bubbleHtml(f));
+      msgs.scrollTop=msgs.scrollHeight;
+      timer=setTimeout(step, 2600);
+    }, 1100);
+  }
+  function start(){ if(started) return; started=true; timer=setTimeout(step, 1500); }
+
+  // joined flow: entry opens invite first; once joined, it opens the chat directly
+  var phone=root.querySelector('.phone'); var joined=false;
+  var join=root.querySelector('#f1join');
+  if(join) join.addEventListener('click', function(){ joined=true; start(); });
+  root.querySelectorAll('[data-f1enter]').forEach(function(el){
+    el.addEventListener('click', function(){ window.Proto.show(phone, joined ? 'f1-chat' : 'f1-invite'); });
+  });
+  var chat=root.querySelector('[data-screen="f1-chat"]');
+  new MutationObserver(function(){ if(chat.classList.contains('active')) start(); }).observe(chat,{attributes:true,attributeFilter:['class']});
+
+  // participants add-friend buttons -> check
+  root.addEventListener('click', function(e){
+    var a=e.target.closest('.f1-addbtn'); if(a && !a.classList.contains('sent')){ a.classList.add('sent');
+      a.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="#5ff780" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l4 4 10-11"/></svg>'; }
+  });
+
+  // composer mic <-> send toggle
+  var cinput=root.querySelector('[data-screen="f1-chat"] [data-input]');
+  var mic=root.querySelector('.f1-mic');
+  function syncMic(){ if(cinput&&mic) mic.classList.toggle('sending', cinput.value.trim().length>0); }
+  if(cinput) cinput.addEventListener('input', syncMic);
+  if(mic) mic.addEventListener('click', function(){ setTimeout(syncMic, 0); });
+
+  // push: replay the drop-in when F1 scrolls into view
+  var push=root.querySelector('#f1push');
+  if(push && 'IntersectionObserver' in window){
+    new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){ push.classList.remove('replay'); void push.offsetWidth; push.classList.add('replay'); } }); }, {threshold:.35}).observe(phone);
+  }
+})();
+</script>
+</body>
+</html>
